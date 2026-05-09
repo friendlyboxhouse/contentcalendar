@@ -1,0 +1,87 @@
+"use client";
+
+import { STATUS_CONFIG } from "@/lib/constants";
+import type { ContentStatus } from "@/lib/types";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { ChevronDown } from "lucide-react";
+
+interface StatusBadgeProps {
+  status: ContentStatus;
+  editable?: boolean;
+  onChange?: (status: ContentStatus) => void;
+  className?: string;
+}
+
+export function StatusBadge({
+  status,
+  editable,
+  onChange,
+  className,
+}: StatusBadgeProps) {
+  const config = STATUS_CONFIG[status];
+
+  const badge = (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+        editable && "cursor-pointer hover:opacity-85",
+        className
+      )}
+      style={{
+        backgroundColor: config.bgColor,
+        color: config.color,
+      }}
+    >
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: config.dotColor }}
+      />
+      {config.emoji} {config.label}
+      {editable && <ChevronDown className="h-3 w-3 opacity-70" />}
+    </span>
+  );
+
+  if (!editable || !onChange) return badge;
+
+  const ordered = Object.entries(STATUS_CONFIG).sort(
+    ([, a], [, b]) => a.order - b.order
+  ) as [ContentStatus, (typeof STATUS_CONFIG)[ContentStatus]][];
+
+  return (
+    <Popover>
+      <PopoverTrigger className="inline-flex border-0 bg-transparent p-0 shadow-none outline-none">
+        {badge}
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-1" align="start">
+        <div className="flex max-h-64 flex-col gap-0.5 overflow-y-auto">
+          {ordered.map(([key, cfg]) => (
+            <button
+              key={key}
+              type="button"
+              className={cn(
+                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent",
+                key === status && "bg-accent/70"
+              )}
+              onClick={() => {
+                onChange(key);
+              }}
+            >
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: cfg.dotColor }}
+              />
+              <span>
+                {cfg.emoji} {cfg.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
