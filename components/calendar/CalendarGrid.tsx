@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -16,7 +17,6 @@ import {
   format,
   addMonths,
   subMonths,
-  isSameDay,
 } from "date-fns";
 import { th } from "date-fns/locale";
 import type { ContentItem } from "@/lib/types";
@@ -27,6 +27,11 @@ import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import Link from "next/link";
 import { calculateDeadlines, resolveSLAKey } from "@/lib/utils";
 import { useContentStore } from "@/store/contentStore";
+import { toast } from "sonner";
+
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export function CalendarGrid({
   items,
@@ -49,7 +54,22 @@ export function CalendarGrid({
 
   const gridStart = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
   const gridEnd = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
-  const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+  const days = useMemo(
+    () => eachDayOfInterval({ start: gridStart, end: gridEnd }),
+    [gridStart, gridEnd]
+  );
+
+  // Build O(n) map from day-key → items, instead of O(n*m) filter per cell.
+  const itemsByDay = useMemo(() => {
+    const map = new Map<string, ContentItem[]>();
+    items.forEach((item) => {
+      const key = dayKey(new Date(item.publishDate));
+      const arr = map.get(key) ?? [];
+      arr.push(item);
+      map.set(key, arr);
+    });
+    return map;
+  }, [items]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -61,6 +81,12 @@ export function CalendarGrid({
     if (!item) return;
     const [yy, mm, dd] = m[1].split("-").map(Number);
     const nextPublish = new Date(yy, mm - 1, dd, 12, 0, 0);
+    // No-op: same day
+    const sameDay =
+      nextPublish.getFullYear() === new Date(item.publishDate).getFullYear() &&
+      nextPublish.getMonth() === new Date(item.publishDate).getMonth() &&
+      nextPublish.getDate() === new Date(item.publishDate).getDate();
+    if (sameDay) return;
     const slaKey = item.slaPresetKey ?? resolveSLAKey(item.format);
     const dl = calculateDeadlines(nextPublish, slaKey);
     updateItem(itemId, {
@@ -69,6 +95,10 @@ export function CalendarGrid({
       productionDeadline: dl.productionDeadline,
       approvalDeadline: dl.approvalDeadline,
     });
+    toast.success(
+      `ย้าย ${item.id} ไป ${nextPublish.toLocaleDateString("th-TH")}`,
+      { duration: 2500 }
+    );
   };
 
   const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -134,9 +164,7 @@ export function CalendarGrid({
           </div>
         ) : (
           days.map((day) => {
-            const dayItems = items.filter((item) =>
-              isSameDay(new Date(item.publishDate), day)
-            );
+            const dayItems = itemsByDay.get(dayKey(day)) ?? [];
             return (
               <CalendarDayCell
                 key={format(day, "yyyy-MM-dd")}

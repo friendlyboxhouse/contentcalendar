@@ -38,6 +38,9 @@ export function reviveContentItem(raw: ContentItem): ContentItem {
     kpiReminderSentAt: raw.kpiReminderSentAt
       ? toDate(raw.kpiReminderSentAt)
       : undefined,
+    kpiReminderSnoozedAt: raw.kpiReminderSnoozedAt
+      ? toDate(raw.kpiReminderSnoozedAt)
+      : undefined,
     publishedAt: raw.publishedAt ? toDate(raw.publishedAt) : undefined,
     performance: raw.performance ? revivePerformance(raw.performance) : undefined,
     approvalTrack: raw.approvalTrack?.map((r) => ({

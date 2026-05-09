@@ -69,32 +69,34 @@ export function calculateDeadlines(publishDate: Date, formatOrPreset: ContentFor
   };
 }
 
-export function getCountdown(targetDate: Date): {
+export function getCountdown(targetDate: Date | string | number): {
   days: number;
   hours: number;
   isOverdue: boolean;
   urgency: "safe" | "warning" | "critical" | "overdue";
 } {
-  const now = new Date();
-  const diff = targetDate.getTime() - now.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor(
-    (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-  );
+  const now = Date.now();
+  const target =
+    targetDate instanceof Date ? targetDate.getTime() : new Date(targetDate).getTime();
+  const diff = target - now;
   const isOverdue = diff < 0;
+  const absMs = Math.abs(diff);
+  const DAY = 1000 * 60 * 60 * 24;
+  const HOUR = 1000 * 60 * 60;
+  // Round (not floor) avoids "1 วันเกินกำหนด" right when the deadline just passed.
+  // For positive diff: floor (เหลือ X วัน เต็ม). For overdue: ceil so 1ms past = 0 วัน.
+  const days = isOverdue
+    ? Math.floor(absMs / DAY) // เกิน X วัน เต็ม
+    : Math.floor(absMs / DAY); // เหลือ X วัน เต็ม
+  const hours = Math.floor((absMs % DAY) / HOUR);
 
   let urgency: "safe" | "warning" | "critical" | "overdue";
   if (isOverdue) urgency = "overdue";
-  else if (days <= 1) urgency = "critical";
+  else if (days < 1) urgency = "critical";
   else if (days <= 3) urgency = "warning";
   else urgency = "safe";
 
-  return {
-    days: Math.abs(days),
-    hours: Math.abs(hours),
-    isOverdue,
-    urgency,
-  };
+  return { days, hours, isOverdue, urgency };
 }
 
 export const COUNTDOWN_COLORS = {

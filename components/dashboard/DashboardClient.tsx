@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { useContentStore } from "@/store/contentStore";
 import type { PlannerFilters, StatCardKey, ContentItem } from "@/lib/types";
 import { FilterBar } from "@/components/shared/FilterBar";
+import { ActiveFilterChips } from "@/components/shared/ActiveFilterChips";
 import { KPIReminderBanner } from "@/components/shared/KPIReminderBanner";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { PillarBreakdown } from "@/components/dashboard/PillarBreakdown";
 import { StatusDistribution } from "@/components/dashboard/StatusDistribution";
 import { CountdownTimer } from "@/components/shared/CountdownTimer";
-import { pseudoTrend } from "@/lib/utils";
 import { STATUS_CONFIG } from "@/lib/constants";
 import { filterContentItems } from "@/lib/filterContent";
 import { computeDashboardStats } from "@/lib/dashboardStats";
@@ -187,18 +187,20 @@ export function DashboardClient() {
         </Link>
       </div>
 
-      <FilterBar
-        filters={filters}
-        onChange={setFilters}
-        options={["pillar", "platform", "status", "format", "month"]}
-        monthOptions={monthOptions}
-      />
+      <div className="space-y-2">
+        <FilterBar
+          filters={filters}
+          onChange={setFilters}
+          options={["pillar", "platform", "status", "format", "month"]}
+          monthOptions={monthOptions}
+        />
+        <ActiveFilterChips filters={filters} onChange={setFilters} />
+      </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatsCard
           title="คอนเทนต์ทั้งหมด"
           value={stats.total}
-          trend={pseudoTrend("total", stats.total)}
           statKey="total"
           active={activeStat === "total"}
           onPress={onStatPress}
@@ -207,7 +209,7 @@ export function DashboardClient() {
         <StatsCard
           title="พร้อมใช้งาน"
           value={stats.inStock}
-          trend={pseudoTrend("stock", stats.inStock)}
+          hint="approved + scheduled"
           statKey="inStock"
           active={activeStat === "inStock"}
           onPress={onStatPress}
@@ -216,7 +218,6 @@ export function DashboardClient() {
         <StatsCard
           title="รออนุมัติ"
           value={stats.pendingApproval}
-          trend={pseudoTrend("pend", stats.pendingApproval)}
           statKey="pendingApproval"
           active={activeStat === "pendingApproval"}
           onPress={onStatPress}
@@ -225,7 +226,6 @@ export function DashboardClient() {
         <StatsCard
           title="ต้องแก้ไข"
           value={stats.needsRework}
-          trend={pseudoTrend("rev", stats.needsRework)}
           statKey="needsRework"
           active={activeStat === "needsRework"}
           onPress={onStatPress}
@@ -234,7 +234,7 @@ export function DashboardClient() {
         <StatsCard
           title="วางแผนแล้ว"
           value={stats.planned}
-          trend={pseudoTrend("plan", stats.planned)}
+          hint="idea / brief / production / review"
           statKey="planned"
           active={activeStat === "planned"}
           onPress={onStatPress}

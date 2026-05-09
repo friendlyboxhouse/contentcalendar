@@ -1,5 +1,6 @@
 import { SideNav } from "@/components/shared/SideNav";
 import { LocalModeBanner } from "@/components/auth/LocalModeBanner";
+import { KeyboardShortcutsHint } from "@/components/shared/KeyboardShortcutsHint";
 
 /**
  * โครงหลักของแอปหลังเข้าสู่ระบบ — รวมจุดเดียวเพื่อ UX/a11y (skip link, landmark เดียว)
@@ -24,6 +25,7 @@ export function AppShellFrame({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+      <KeyboardShortcutsHint />
     </>
   );
 }

@@ -90,6 +90,7 @@ export interface ContentItem {
 
   kpiTargets: KPITargets;
   kpiReminderSentAt?: Date;
+  kpiReminderSnoozedAt?: Date;
 
   publishedAt?: Date;
   performance?: PerformanceData;

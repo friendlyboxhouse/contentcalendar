@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useContentStore } from "@/store/contentStore";
 import type { ContentItem, PlannerFilters } from "@/lib/types";
 import { FilterBar } from "@/components/shared/FilterBar";
+import { ActiveFilterChips } from "@/components/shared/ActiveFilterChips";
 import { CalendarGrid } from "@/components/calendar/CalendarGrid";
 import { filterContentItems } from "@/lib/filterContent";
 import {
@@ -125,11 +126,14 @@ export function CalendarPageClient() {
         </div>
       </div>
 
-      <FilterBar
-        filters={filters}
-        onChange={setFilters}
-        options={["pillar", "platform", "status", "format"]}
-      />
+      <div className="space-y-2">
+        <FilterBar
+          filters={filters}
+          onChange={setFilters}
+          options={["pillar", "platform", "status", "format"]}
+        />
+        <ActiveFilterChips filters={filters} onChange={setFilters} />
+      </div>
 
       {view === "calendar" && !narrow ? (
         <CalendarGrid

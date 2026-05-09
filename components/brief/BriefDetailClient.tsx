@@ -51,6 +51,7 @@ import { MaterialIcon } from "@/components/ui/material-icon";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
+import { useDraftAutosave } from "@/hooks/useDraftAutosave";
 import {
   Dialog,
   DialogContent,
@@ -120,18 +121,36 @@ export function BriefDetailClient({ briefId }: Props) {
   const [pendingGenericStatus, setPendingGenericStatus] =
     useState<ContentStatus | null>(null);
 
+  // Initialize draft once per briefId — DO NOT depend on `existing` (new ref each render).
+  // This prevents unsaved edits from being wiped when store updates from elsewhere.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isNew && seedNewRef.current) {
       setDraft(mergeBriefDraft(seedNewRef.current));
       return;
     }
-    if (!isNew && existing) {
-      setDraft(mergeBriefDraft({ ...existing }));
+    if (!isNew && briefId) {
+      const fromStore = useContentStore
+        .getState()
+        .items.find((i) => i.id === briefId);
+      if (fromStore) {
+        setDraft(mergeBriefDraft({ ...fromStore }));
+      }
     }
-  }, [isNew, existing, briefId]);
+    // Only re-init when navigating to a different brief
+  }, [briefId, isNew]);
 
   const slaPreset: SLAPresetKey =
     draft?.slaPresetKey ?? resolveSLAKey(draft?.format ?? "static_post");
+
+  // Auto-save unsaved edits to localStorage every 1s for resilience.
+  const autosaveKey = isNew ? "brief-new" : `brief-${briefId ?? ""}`;
+  const { savedAt, hasUnsaved, clearDraft } = useDraftAutosave({
+    key: autosaveKey,
+    value: draft,
+    debounceMs: 1000,
+    disabled: !canEdit,
+  });
 
   const syncDeadlines = (publish: Date, preset: SLAPresetKey, fmt: ContentFormat) => {
     const key = preset ?? resolveSLAKey(fmt);
@@ -276,10 +295,12 @@ export function BriefDetailClient({ briefId }: Props) {
     };
     if (isNew) {
       addItem(cleaned);
+      clearDraft();
       toast.success(`บันทึก ${cleaned.id} และเพิ่มในปฏิทินแล้ว`);
       router.replace(`/briefs/${cleaned.id}`);
     } else {
       updateItem(cleaned.id, cleaned);
+      clearDraft();
       toast.success(`บันทึก ${cleaned.id} แล้ว`);
     }
   };
@@ -337,7 +358,25 @@ export function BriefDetailClient({ briefId }: Props) {
           </h1>
           <PillarTag pillar={draft.pillar} size="sm" />
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {canEdit && (
+            <span
+              className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex"
+              title={savedAt ? `บันทึกอัตโนมัติเมื่อ ${savedAt.toLocaleTimeString("th-TH")}` : ""}
+            >
+              {hasUnsaved ? (
+                <>
+                  <MaterialIcon name="cloud_sync" size={14} className="animate-pulse text-amber-600" />
+                  <span>กำลังบันทึก…</span>
+                </>
+              ) : savedAt ? (
+                <>
+                  <MaterialIcon name="cloud_done" size={14} className="text-emerald-600" />
+                  <span>บันทึกร่างอัตโนมัติแล้ว</span>
+                </>
+              ) : null}
+            </span>
+          )}
           {!isNew && (
             <Link
               href={`/performance/${draft.id}`}

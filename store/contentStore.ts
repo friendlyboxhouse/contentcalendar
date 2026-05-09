@@ -33,6 +33,7 @@ interface ContentStore {
   removeItemRemote: (id: string) => void;
 
   updateStatus: (id: string, status: ContentStatus) => void;
+  snoozeKPIReminder: (id: string) => void;
 
   getKPIReminderItems: () => ContentItem[];
   getStats: () => DashboardStats;
@@ -138,22 +139,39 @@ export const useContentStore = create<ContentStore>()(
           items: s.items.filter((i) => i.id !== id),
         })),
 
+      snoozeKPIReminder: (id) => {
+        get().updateItem(id, { kpiReminderSnoozedAt: new Date() });
+      },
+
       updateStatus: (id, status) => {
         const updates: Partial<ContentItem> = { status };
-        if (status === "published") {
-          updates.publishedAt = new Date();
+        if (status === "published" || status === "kpi_pending") {
+          // Set publishedAt only on first transition to published; preserve if already set.
+          const existing = get().items.find((i) => i.id === id);
+          if (!existing?.publishedAt) {
+            updates.publishedAt = new Date();
+          }
+        } else {
+          // Reverting away from published-state — clear publishedAt so KPI timers reset.
+          updates.publishedAt = undefined;
         }
         get().updateItem(id, updates);
       },
 
       getKPIReminderItems: () => {
-        const now = new Date();
+        const now = Date.now();
+        const MAX_REMINDER_DAYS = Math.max(...KPI_REMINDER_DAYS) + 14; // sliding window
         return get().items.filter((item) => {
           if (!item.publishedAt) return false;
+          if (item.kpiReminderSnoozedAt) {
+            const snoozeMs = now - new Date(item.kpiReminderSnoozedAt).getTime();
+            // Snooze for 3 days
+            if (snoozeMs < 1000 * 60 * 60 * 24 * 3) return false;
+          }
           const daysSincePublish = Math.floor(
-            (now.getTime() - item.publishedAt.getTime()) /
-              (1000 * 60 * 60 * 24)
+            (now - new Date(item.publishedAt).getTime()) / (1000 * 60 * 60 * 24)
           );
+          if (daysSincePublish > MAX_REMINDER_DAYS) return false;
           const isReminderDay = KPI_REMINDER_DAYS.some(
             (day) => daysSincePublish >= day
           );

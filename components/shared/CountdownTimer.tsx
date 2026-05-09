@@ -1,14 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { getCountdown, COUNTDOWN_COLORS } from "@/lib/utils";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { cn } from "@/lib/utils";
 
 interface CountdownTimerProps {
-  targetDate: Date;
+  targetDate: Date | string | number;
   label?: string;
   compact?: boolean;
   className?: string;
+  /** ms — re-render interval. Default 60_000 (1 min). */
+  refreshMs?: number;
 }
 
 export function CountdownTimer({
@@ -16,7 +19,17 @@ export function CountdownTimer({
   label,
   compact = false,
   className,
+  refreshMs = 60_000,
 }: CountdownTimerProps) {
+  // Tick triggers re-render so countdown stays current.
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (refreshMs <= 0) return;
+    const id = setInterval(() => setTick((t) => t + 1), refreshMs);
+    return () => clearInterval(id);
+  }, [refreshMs]);
+
   const { days, hours, isOverdue, urgency } = getCountdown(targetDate);
   const colors = COUNTDOWN_COLORS[urgency];
 
@@ -28,15 +41,18 @@ export function CountdownTimer({
           colors.text,
           className
         )}
+        title={label}
       >
         {isOverdue ? (
           <MaterialIcon name="warning" size={14} className="shrink-0 opacity-90" />
         ) : null}
         {isOverdue
-          ? `${days} วันเกินกำหนด`
+          ? days === 0
+            ? `เกิน ${hours} ชม.`
+            : `${days} วันเกินกำหนด`
           : days === 0
-            ? `${hours} ชม.`
-            : `${days} วัน`}
+            ? `เหลือ ${hours} ชม.`
+            : `เหลือ ${days} วัน`}
       </span>
     );
   }
@@ -58,7 +74,9 @@ export function CountdownTimer({
       <span>
         {label && `${label}: `}
         {isOverdue
-          ? `เกิน ${days} วัน`
+          ? days === 0
+            ? `เกิน ${hours} ชม.`
+            : `เกิน ${days} วัน`
           : days === 0
             ? `เหลือ ${hours} ชม.`
             : `เหลือ ${days} วัน`}

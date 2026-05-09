@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ContentPillar, PlannerFilters } from "@/lib/types";
 import { useContentStore } from "@/store/contentStore";
 import { FilterBar } from "@/components/shared/FilterBar";
+import { ActiveFilterChips } from "@/components/shared/ActiveFilterChips";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { MaterialIcon } from "@/components/ui/material-icon";
@@ -59,7 +60,10 @@ export function PerformanceOverviewClient() {
     return list;
   }, [published, filters]);
 
-  const reviewed = published.filter((i) => i.performance?.finalMetrics);
+  const reviewed = useMemo(
+    () => published.filter((i) => i.performance?.finalMetrics),
+    [published]
+  );
   const avgER = useMemo(() => {
     if (!reviewed.length) return 0;
     const sum = reviewed.reduce((acc, i) => {
@@ -135,11 +139,14 @@ export function PerformanceOverviewClient() {
         </p>
       </div>
 
-      <FilterBar
-        filters={filters}
-        onChange={setFilters}
-        options={["pillar", "platform", "funnelStage", "kpiFilter"]}
-      />
+      <div className="space-y-2">
+        <FilterBar
+          filters={filters}
+          onChange={setFilters}
+          options={["pillar", "platform", "funnelStage", "kpiFilter"]}
+        />
+        <ActiveFilterChips filters={filters} onChange={setFilters} />
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card>

@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useContentStore } from "@/store/contentStore";
 import type { ContentItem, ContentStatus, PlannerFilters } from "@/lib/types";
 import { FilterBar } from "@/components/shared/FilterBar";
+import { ActiveFilterChips } from "@/components/shared/ActiveFilterChips";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -177,6 +178,7 @@ function BriefsInner() {
           owners={owners}
         />
       </div>
+      <ActiveFilterChips filters={filters} onChange={setFilters} />
 
       <div className="space-y-3">
         {filtered.map((item) => {
