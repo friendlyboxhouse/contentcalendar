@@ -18,6 +18,13 @@ const config: Config = {
           "system-ui",
           "sans-serif",
         ],
+        heading: [
+          "var(--font-noto-thai)",
+          "var(--font-inter)",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
       },
       colors: {
         background: "var(--background)",

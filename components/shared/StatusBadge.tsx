@@ -8,7 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { ChevronDown } from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
 
 interface StatusBadgeProps {
   status: ContentStatus;
@@ -28,7 +28,7 @@ export function StatusBadge({
   const badge = (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+        "inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium",
         editable && "cursor-pointer hover:opacity-85",
         className
       )}
@@ -42,7 +42,9 @@ export function StatusBadge({
         style={{ backgroundColor: config.dotColor }}
       />
       {config.emoji} {config.label}
-      {editable && <ChevronDown className="h-3 w-3 opacity-70" />}
+      {editable ? (
+        <MaterialIcon name="expand_more" size={16} className="opacity-70" />
+      ) : null}
     </span>
   );
 
@@ -64,7 +66,7 @@ export function StatusBadge({
               key={key}
               type="button"
               className={cn(
-                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent",
+                "flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent",
                 key === status && "bg-accent/70"
               )}
               onClick={() => {

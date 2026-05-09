@@ -7,7 +7,7 @@ export const PILLAR_CONFIG = {
     bgColor: "#EFF6FF",
     darkBg: "#1E3A5F",
     emoji: "🔵",
-    icon: "BookOpen",
+    icon: "menu_book",
   },
   micro_wellness: {
     label: "Micro Wellness",
@@ -15,7 +15,7 @@ export const PILLAR_CONFIG = {
     bgColor: "#ECFDF5",
     darkBg: "#064E3B",
     emoji: "🌿",
-    icon: "Heart",
+    icon: "spa",
   },
   sport: {
     label: "Sport",
@@ -23,7 +23,7 @@ export const PILLAR_CONFIG = {
     bgColor: "#F7FEE7",
     darkBg: "#1A2E05",
     emoji: "🟢",
-    icon: "Zap",
+    icon: "bolt",
   },
   recommend_review: {
     label: "Recommend & Review",
@@ -31,7 +31,7 @@ export const PILLAR_CONFIG = {
     bgColor: "#FFF7ED",
     darkBg: "#431407",
     emoji: "🟠",
-    icon: "Star",
+    icon: "star",
   },
   mood: {
     label: "Mood",
@@ -39,7 +39,7 @@ export const PILLAR_CONFIG = {
     bgColor: "#FDF2F8",
     darkBg: "#500724",
     emoji: "🩷",
-    icon: "Sparkles",
+    icon: "auto_awesome",
   },
   fun_content: {
     label: "Fun Content",
@@ -47,7 +47,7 @@ export const PILLAR_CONFIG = {
     bgColor: "#FEFCE8",
     darkBg: "#422006",
     emoji: "🟡",
-    icon: "Laugh",
+    icon: "sentiment_satisfied",
   },
 } as const;
 

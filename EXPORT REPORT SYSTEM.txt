@@ -1,0 +1,1177 @@
+📄 EXPORT REPORT SYSTEM — Content Planner
+Complete Cursor AI Prompt Pack | Executive-Ready Output
+PART 1 — DESIGN PHILOSOPHY & INTERNATIONAL STANDARD
+ก่อนเขียน Prompt ให้ Cursor — ต้องเข้าใจหลักการที่ระบบนี้ยึดถือก่อน
+
+unknown
+Copy
+INTERNATIONAL STANDARD REFERENCE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. McKinsey / BCG Report Style
+   → Executive Summary ก่อนเสมอ
+   → ข้อมูลเยอะแต่อ่านได้ใน 2 นาที
+   → ทุก Section มี "So What?" ชัดเจน
+
+2. HubSpot / Sprout Social Report Style  
+   → Data Visualization เป็น Hero
+   → สีใช้มีความหมาย ไม่ใช่แค่สวย
+   → Insight > Raw Numbers
+
+3. Editorial Calendar Standard (CMI)
+   → Timeline ต้องอ่านแนวนอนได้ชัด
+   → Color-coded by Category/Pillar
+   → Status ต้องเห็นได้ใน Glance
+
+TYPOGRAPHY HIERARCHY (International Standard):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+H1 Report Title    : 28px / Bold 700     / tracking-tight
+H2 Section Title   : 18px / SemiBold 600 / tracking-normal  
+H3 Subsection      : 14px / SemiBold 600 / uppercase + tracking-widest
+Body Primary       : 13px / Regular 400  / leading-relaxed
+Body Secondary     : 12px / Regular 400  / text-gray-500
+Data Number (Hero) : 36px / Bold 700     / tabular-nums
+Data Number (Card) : 24px / Bold 700     / tabular-nums
+Label / Tag        : 11px / Medium 500   / uppercase tracking-wide
+Caption            : 10px / Regular 400  / text-gray-400
+
+SPACING SYSTEM:
+━━━━━━━━━━━━━━━
+Page Margin   : 48px (Print) / 40px (Screen)
+Section Gap   : 32px
+Card Padding  : 20px
+Element Gap   : 12px
+Tight Gap     : 8px
+PART 2 — REPORT STRUCTURE BLUEPRINT
+unknown
+Copy
+WEEKLY ACTION PLAN (2 Pages)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Page 1:
+  ┌─ Header Bar (Brand + Week Range + Generated Date)
+  ├─ Executive Summary Strip (4 KPI numbers)
+  ├─ Weekly Calendar Grid (7 days × Content Chips)
+  └─ Pipeline Status Overview (Horizontal bar)
+
+Page 2:
+  ┌─ Content Detail Table (all posts this week)
+  ├─ Deadline Alert Section (overdue / at-risk)
+  └─ Team Workload Summary
+
+MONTHLY REPORT (4 Pages)
+━━━━━━━━━━━━━━━━━━━━━━━━
+Page 1: Executive Summary
+  ┌─ Cover-style Header
+  ├─ Month-in-Numbers (6 Hero Stats)
+  ├─ Pillar Balance Chart (Donut)
+  └─ KPI Performance Highlights
+
+Page 2: Content Calendar Overview
+  ┌─ Full Month Grid (color-coded)
+  └─ Platform Distribution
+
+Page 3: Performance Deep Dive
+  ┌─ Top 3 Performing Posts
+  ├─ KPI Scorecard by Pillar
+  └─ Format Performance Comparison
+
+Page 4: Next Month Preview + Action Items
+  ┌─ Planned Content Summary
+  ├─ Recommendations (3 bullets)
+  └─ Approval Pending List
+PART 3 — CURSOR AI PROMPT (Production Ready)
+🟢 MAIN PROMPT — Export Report System
+unknown
+Copy
+Create a complete Export Report System for the Content Planner app.
+This system generates two report types:
+1. Weekly Action Plan
+2. Monthly Executive Report
+
+Both reports render as a React component that can be:
+- Viewed on screen (preview modal)
+- Exported to PDF via browser print (window.print())
+- The PDF must look identical to screen preview
+
+─────────────────────────────────────────────────────────────
+FILE STRUCTURE TO CREATE:
+─────────────────────────────────────────────────────────────
+
+components/
+  export/
+    ExportModal.tsx          ← Modal wrapper with preview + export button
+    WeeklyReport.tsx         ← Weekly report layout
+    MonthlyReport.tsx        ← Monthly report layout
+    report-components/
+      ReportHeader.tsx       ← Reusable header bar
+      ExecSummaryStrip.tsx   ← 4-6 hero stat numbers in a row
+      WeeklyCalendarGrid.tsx ← 7-column calendar for weekly view
+      MonthlyCalendarGrid.tsx← Full month calendar grid
+      ContentDetailTable.tsx ← Detailed table of content items
+      PillarDonutChart.tsx   ← Donut chart (recharts)
+      KPIScorecardTable.tsx  ← KPI pass/fail table per pillar
+      TopPostsSection.tsx    ← Top 3 posts with metrics
+      FormatComparisonBar.tsx← Horizontal bar chart by format
+      DeadlineAlertSection.tsx← Overdue + at-risk deadlines
+      ActionItemsSection.tsx ← Recommendations + next steps
+      PipelineStatusBar.tsx  ← Horizontal pipeline with counts
+
+lib/
+  reportUtils.ts             ← Data aggregation functions
+  reportStyles.ts            ← Shared print CSS constants
+
+─────────────────────────────────────────────────────────────
+STEP 1: CREATE lib/reportUtils.ts
+─────────────────────────────────────────────────────────────
+
+Export these functions:
+
+// Filter items for a specific week (Mon–Sun)
+getWeeklyItems(
+  items: ContentItem[], 
+  weekStart: Date
+): ContentItem[]
+
+// Filter items for a specific month
+getMonthlyItems(
+  items: ContentItem[], 
+  year: number, 
+  month: number
+): ContentItem[]
+
+// Aggregate stats from a list of items
+aggregateStats(items: ContentItem[]): {
+  total: number
+  published: number
+  scheduled: number
+  pendingApproval: number
+  inProduction: number
+  needsRework: number
+  planned: number
+  kpiPending: number
+  byPillar: Record<ContentPillar, number>
+  byFormat: Record<ContentFormat, number>
+  byStatus: Record<ContentStatus, number>
+  byPlatform: Record<string, number>
+}
+
+// Calculate performance averages from items with performance data
+aggregatePerformance(items: ContentItem[]): {
+  avgEngagementRate: number
+  avgSaveRate: number
+  avgShareRate: number
+  avgWatchTime: number
+  totalReach: number
+  totalSaves: number
+  kpiPassRate: number           // % of KPIs passed overall
+  topPost: ContentItem | null   // highest engagement rate
+  worstPost: ContentItem | null // lowest engagement rate
+  byPillar: Record<ContentPillar, {
+    avgEngagementRate: number
+    kpiPassRate: number
+    count: number
+  }>
+  byFormat: Record<ContentFormat, {
+    avgEngagementRate: number
+    count: number
+  }>
+}
+
+// Get at-risk items (deadline within 2 days or overdue)
+getAtRiskItems(items: ContentItem[]): {
+  overdue: ContentItem[]   // deadline passed, not published
+  critical: ContentItem[]  // deadline within 1 day
+  warning: ContentItem[]   // deadline within 3 days
+}
+
+// Get top N posts by engagement rate
+getTopPosts(items: ContentItem[], n: number): ContentItem[]
+
+// Generate action recommendations based on data
+generateRecommendations(
+  stats: ReturnType<typeof aggregateStats>,
+  perf: ReturnType<typeof aggregatePerformance>
+): string[]
+// Rules for recommendations:
+// - If any pillar has 0 content → "Add content for [Pillar]"
+// - If kpiPassRate < 50% → "Review content strategy for low KPIs"
+// - If needsRework > 3 → "High revision rate — review Brief quality"
+// - If pendingApproval > 5 → "Approval bottleneck detected"
+// - Top performing pillar → "Double down on [Pillar] content"
+
+─────────────────────────────────────────────────────────────
+STEP 2: CREATE lib/reportStyles.ts
+─────────────────────────────────────────────────────────────
+
+Export a string constant PRINT_STYLES containing global CSS for 
+@media print that:
+
+- Sets page size to A4 landscape for monthly, A4 portrait for weekly
+- Removes all browser default margins
+- Hides elements with class "no-print"
+- Forces background colors to print (use -webkit-print-color-adjust: exact)
+- Ensures page breaks with .page-break class → page-break-after: always
+- Sets body font to "Inter, sans-serif"
+- Removes all shadows (box-shadow: none !important)
+- Converts all rounded corners to: border-radius: 4px
+
+Export REPORT_FONT_SIZES as an object:
+{
+  reportTitle: "text-[28px]",
+  sectionTitle: "text-[18px]",
+  subsectionTitle: "text-[11px]",  // uppercase tracking-widest
+  bodyPrimary: "text-[13px]",
+  bodySecondary: "text-[12px]",
+  heroNumber: "text-[36px]",
+  cardNumber: "text-[24px]",
+  label: "text-[11px]",
+  caption: "text-[10px]",
+}
+
+─────────────────────────────────────────────────────────────
+STEP 3: CREATE report-components/ReportHeader.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  brandName: string
+  reportType: "Weekly Action Plan" | "Monthly Executive Report"
+  dateRange: string         // e.g. "2–8 June 2025" or "June 2025"
+  generatedAt: Date
+  accentColor?: string      // default: "#111827"
+
+Layout: full-width horizontal bar, height 72px
+Left side:
+  - Brand name: 18px SemiBold, color: accentColor
+  - Report type below brand: 11px uppercase tracking-widest, gray-400
+
+Center:
+  - Date range: 22px Bold, gray-900
+  - "Week X of YYYY" or month context below: 11px gray-400
+
+Right side:
+  - "Generated:" label in gray-400 11px
+  - Date in 12px Medium gray-600
+  - Small calendar icon (lucide-react)
+
+Bottom border: 2px solid accentColor
+
+─────────────────────────────────────────────────────────────
+STEP 4: CREATE report-components/ExecSummaryStrip.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  stats: Array<{
+    label: string
+    value: number | string
+    unit?: string          // e.g. "posts", "%", ""
+    trend?: number         // positive = green, negative = red
+    trendLabel?: string    // e.g. "vs last month"
+    highlight?: boolean    // makes this card have accent bg
+    icon?: string          // lucide icon name
+  }>
+  columns?: 4 | 5 | 6     // default 4
+
+Layout: horizontal row of stat cards
+Each card:
+  - Background: white with 1px border gray-200
+    If highlight=true: bg-gray-900, all text white
+  - Top: icon (16px, gray-400) + label (11px uppercase tracking-wide gray-500)
+  - Middle: value number (36px Bold tabular-nums) + unit (14px gray-400 self-end)
+  - Bottom (if trend): 
+      arrow up ↑ + trend% in green-600 OR arrow down ↓ in red-500
+      trendLabel in gray-400 11px
+  - Padding: 20px
+  - Border-radius: 8px
+
+─────────────────────────────────────────────────────────────
+STEP 5: CREATE report-components/WeeklyCalendarGrid.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  items: ContentItem[]
+  weekStart: Date
+
+Layout: 7-column grid (Monday to Sunday)
+Each column:
+  Header: Day name (MON, TUE...) in 11px uppercase tracking-widest gray-500
+          Date number below in 22px Bold gray-900
+          If today: circle background accent color, white text
+  
+  Body: Stack of ContentChipPrint components (see below)
+  Empty day: light gray dashed border, min-height 120px
+
+ContentChipPrint (used only in reports, NOT the main app chip):
+  - Left border 3px solid PILLAR_CONFIG[pillar].color
+  - Background: PILLAR_CONFIG[pillar].bgColor
+  - Border-radius: 6px
+  - Padding: 8px 10px
+  - Margin-bottom: 6px
+  
+  Layout inside chip:
+    Row 1: POST ID (10px gray-400 tabular-nums) 
+           + Platform icon text (10px gray-400) — right-aligned
+    Row 2: Topic (12px SemiBold gray-900, max 2 lines, line-clamp-2)
+    Row 3: 
+      Left: Format badge (10px, colored dot + text)
+      Right: Status badge using STATUS_CONFIG color
+    Row 4 (if published with performance):
+      ER: X.X% in green-600 10px | Saves: XXX in blue-600 10px
+
+─────────────────────────────────────────────────────────────
+STEP 6: CREATE report-components/MonthlyCalendarGrid.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  items: ContentItem[]
+  year: number
+  month: number
+
+Layout: Same 7-column grid but shows full month (4–6 rows)
+Scale down ContentChipPrint to micro size:
+  - Height fixed: 36px
+  - Show only: pillar color border + topic (1 line truncated) + status dot
+  - Tooltip on hover (screen only, not print) showing full details
+
+Below calendar:
+  Platform Legend row: 
+    For each platform that has posts this month:
+    Platform icon + name + post count badge
+
+─────────────────────────────────────────────────────────────
+STEP 7: CREATE report-components/ContentDetailTable.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  items: ContentItem[]
+  showPerformance?: boolean  // adds metric columns if true
+
+Table layout with these columns:
+
+BASE COLUMNS (always shown):
+  #     : POST ID — 10px tabular-nums gray-400, width 70px
+  ●     : Pillar color dot — 10px circle, width 24px
+  CONTENT: Topic (13px SemiBold) + Format·Platform below (11px gray-400)
+           width: flex-1
+  OWNER : 12px gray-600, width 80px
+  PUBLISH: Date formatted as "1 Jun" (12px) + Time (11px gray-400), width 72px
+  STATUS : StatusBadge compact version, width 120px
+  DEADLINE: CountdownTimer compact, colored by urgency, width 100px
+
+PERFORMANCE COLUMNS (if showPerformance=true):
+  REACH : number formatted with K suffix, 12px tabular-nums, width 72px
+  ER    : Engagement Rate %, color green if > target, red if below, width 60px
+  SAVES : number, width 60px
+  KPI   : "3/4 ✅" pass rate badge, width 60px
+
+Table styling:
+  Header row: 11px uppercase tracking-widest gray-500
+              border-bottom 2px solid gray-200
+              padding: 8px 12px
+  Data row: 13px, padding 10px 12px
+            border-bottom 1px solid gray-100
+            Alternating row bg: white / gray-50
+            Hover (screen only): bg-blue-50
+  
+  If item.status === 'revision': 
+    row has left accent bar 3px red-400
+
+─────────────────────────────────────────────────────────────
+STEP 8: CREATE report-components/PillarDonutChart.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  data: Record<ContentPillar, number>
+  title?: string
+  size?: 'sm' | 'lg'  // sm=160px, lg=200px
+
+Use recharts PieChart with innerRadius.
+Each slice: fill = PILLAR_CONFIG[pillar].color
+
+Center of donut:
+  Total number: 28px Bold
+  "posts" label: 11px gray-400
+
+Legend (right side of chart, vertical):
+  Each item:
+    Colored square 10px + Pillar label 12px + count 12px Bold 
+    + percentage (11px gray-400)
+  Sorted by count descending
+
+─────────────────────────────────────────────────────────────
+STEP 9: CREATE report-components/KPIScorecardTable.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  perfByPillar: Record<ContentPillar, {
+    avgEngagementRate: number
+    kpiPassRate: number
+    count: number
+  }>
+
+Table with columns:
+  PILLAR         : PillarTag component (compact)
+  POSTS REVIEWED : count, 13px tabular-nums
+  AVG ER         : percentage with inline mini bar
+                   Bar width = value/20*100% capped at 100%
+                   Color: green if >8%, amber if 4-8%, red if <4%
+  KPI PASS RATE  : percentage with colored badge
+                   Green badge if >75%, Amber if 50-75%, Red if <50%
+  VERDICT        : 
+    >75% → "✅ On Track" in green-700 
+    50–75% → "⚠️ Watch" in amber-700
+    <50% → "❌ Needs Review" in red-700
+
+─────────────────────────────────────────────────────────────
+STEP 10: CREATE report-components/TopPostsSection.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  posts: ContentItem[]   // exactly 3 items
+
+Layout: 3 cards side by side (or stacked if only 1-2)
+
+Each card:
+  Top bar: PILLAR color (full width, height 4px)
+  Rank badge: "#1" / "#2" / "#3" in top-right corner
+              #1 = gold bg (#F59E0B) white text
+              #2 = silver bg (#9CA3AF) white text  
+              #3 = bronze bg (#D97706) white text
+
+  Card body (padding 16px):
+    POST ID: 11px gray-400 tabular-nums
+    Topic: 14px SemiBold gray-900 (2 lines max)
+    Format + Platform: 11px gray-400
+    
+    Divider line
+    
+    Metrics grid (2×2):
+      Engagement Rate: value large (20px Bold) + label (10px)
+      Save Rate: value + label
+      Reach: value (K-formatted) + label  
+      Saves: value + label
+    
+    Bottom: "What Worked" text
+            Italic 12px gray-600 (max 2 lines)
+
+─────────────────────────────────────────────────────────────
+STEP 11: CREATE report-components/DeadlineAlertSection.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  overdue: ContentItem[]
+  critical: ContentItem[]
+  warning: ContentItem[]
+
+Only render if any array has items.
+
+Layout: 3 horizontal bands (only show bands with items)
+
+OVERDUE band: bg-red-50, left border 4px red-500
+  Header: "🚨 OVERDUE" in red-700 11px uppercase tracking-wide
+          + count badge in red-500
+  Items: inline chips showing POST ID + Topic + "X days overdue"
+
+CRITICAL band: bg-amber-50, left border 4px amber-500
+  Header: "⚠️ DUE WITHIN 24H" in amber-700
+  Items: same chip style
+
+WARNING band: bg-blue-50, left border 4px blue-400
+  Header: "📅 DUE THIS WEEK" in blue-700
+  Items: same chip style
+
+─────────────────────────────────────────────────────────────
+STEP 12: CREATE report-components/PipelineStatusBar.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  stats: ReturnType<typeof aggregateStats>
+
+Layout: Horizontal row showing each status as a segment
+
+Each status segment:
+  Colored background using STATUS_CONFIG[status].bgColor
+  Top: status emoji + label (11px)
+  Middle: count number (20px Bold) colored by STATUS_CONFIG[status].color
+  Width proportional to count (min-width 40px)
+  Segments separated by subtle divider
+
+Below bar: 
+  Total: X posts across all stages (13px gray-500)
+
+─────────────────────────────────────────────────────────────
+STEP 13: CREATE WeeklyReport.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  items: ContentItem[]
+  weekStart: Date
+  brandName: string
+
+This component renders 2 "pages" (two div blocks with page-break-after).
+
+Import and use functions from reportUtils.ts to derive all data.
+Do not pass pre-computed data — compute inside the component.
+
+PAGE 1 LAYOUT (A4 Portrait: max-width 794px):
+
+  <ReportHeader
+    reportType="Weekly Action Plan"
+    dateRange={format weekStart to weekEnd as "2–8 June 2025"}
+  />
+
+  Section: EXECUTIVE SUMMARY
+    Label: "WEEK AT A GLANCE" — 11px uppercase tracking-widest gray-500
+    <ExecSummaryStrip columns={5} stats={[
+      { label: "Total This Week", value: weekItems.length, unit: "posts" },
+      { label: "Published", value: published count },
+      { label: "Scheduled", value: scheduled count, highlight: true },
+      { label: "In Production", value: inProduction count },
+      { label: "Pending Approval", value: pendingApproval count }
+    ]} />
+
+  Section: WEEKLY CALENDAR
+    Label: "CONTENT SCHEDULE"
+    <WeeklyCalendarGrid items={weekItems} weekStart={weekStart} />
+
+  Section: PIPELINE STATUS
+    Label: "PRODUCTION PIPELINE"
+    <PipelineStatusBar stats={aggregateStats(weekItems)} />
+
+PAGE 2 LAYOUT:
+
+  Section: CONTENT DETAILS
+    Label: "ALL CONTENT THIS WEEK"
+    <ContentDetailTable 
+      items={weekItems sorted by publishDate ascending} 
+      showPerformance={false}
+    />
+
+  Section: DEADLINE ALERTS (only if at-risk items exist)
+    Label: "DEADLINE ALERTS"
+    <DeadlineAlertSection ...atRiskItems />
+
+  Section: WORKLOAD SUMMARY
+    Label: "TEAM WORKLOAD"
+    Simple table: Owner name | Count of items | Status breakdown
+    Show which team member has the most items this week
+
+─────────────────────────────────────────────────────────────
+STEP 14: CREATE MonthlyReport.tsx
+─────────────────────────────────────────────────────────────
+
+Props:
+  items: ContentItem[]        // all items in the store
+  year: number
+  month: number
+  brandName: string
+
+Renders 4 "pages" with page-break-after between each.
+
+Compute inside component using reportUtils:
+  const monthItems = getMonthlyItems(items, year, month)
+  const stats = aggregateStats(monthItems)
+  const perf = aggregatePerformance(monthItems)
+  const atRisk = getAtRiskItems(monthItems)
+  const topPosts = getTopPosts(monthItems, 3)
+  const recommendations = generateRecommendations(stats, perf)
+
+  // Previous month for trend comparison
+  const prevMonthItems = getMonthlyItems(items, prevYear, prevMonth)
+  const prevStats = aggregateStats(prevMonthItems)
+
+PAGE 1 — EXECUTIVE SUMMARY:
+
+  <ReportHeader reportType="Monthly Executive Report" dateRange="June 2025" />
+
+  Section: MONTH IN NUMBERS
+    Label: "JUNE 2025 AT A GLANCE"
+    <ExecSummaryStrip columns={6} stats={[
+      { 
+        label: "Total Content", 
+        value: stats.total, 
+        unit: "posts",
+        trend: stats.total - prevStats.total,
+        trendLabel: "vs last month",
+        highlight: true
+      },
+      { label: "Published", value: stats.published },
+      { label: "Avg Eng. Rate", value: perf.avgEngagementRate, unit: "%" },
+      { label: "Total Reach", value: perf.totalReach (K-formatted) },
+      { label: "KPI Pass Rate", value: perf.kpiPassRate, unit: "%" },
+      { label: "Pending Approval", value: stats.pendingApproval }
+    ]} />
+
+  Two-column layout (60/40 split):
+    Left 60%:
+      Label: "CONTENT BY PILLAR"
+      <PillarDonutChart data={stats.byPillar} size="lg" />
+    
+    Right 40%:
+      Label: "PIPELINE STATUS"
+      <PipelineStatusBar stats={stats} />
+      
+      Spacing below:
+      Label: "TOP FORMAT"
+      Show the format with most posts:
+        Format name + count + simple bar
+
+PAGE 2 — CONTENT CALENDAR OVERVIEW:
+
+  Section: FULL MONTH CALENDAR
+    Label: "JUNE 2025 — CONTENT CALENDAR"
+    Subtitle: "Color-coded by Content Pillar"
+    
+    Pillar color legend row (horizontal, compact):
+      For each pillar: colored square 10px + label 11px + count badge
+    
+    <MonthlyCalendarGrid items={monthItems} year={year} month={month} />
+    
+    Below calendar:
+    Platform breakdown row:
+      For each platform: icon + name + "X posts" 
+      Horizontal bar showing relative distribution
+
+PAGE 3 — PERFORMANCE DEEP DIVE:
+  (Only render if perf.topPost exists, else show "No performance data yet")
+
+  Section: TOP PERFORMING CONTENT
+    Label: "TOP 3 POSTS THIS MONTH"
+    <TopPostsSection posts={topPosts} />
+
+  Section: KPI BY PILLAR
+    Label: "KPI SCORECARD BY CONTENT PILLAR"
+    <KPIScorecardTable perfByPillar={perf.byPillar} />
+
+  Section: FORMAT PERFORMANCE
+    Label: "ENGAGEMENT RATE BY FORMAT"
+    <FormatComparisonBar data={perf.byFormat} />
+    Horizontal bar chart showing each format's avg ER
+    Bars colored by a sequential blue palette
+    Value label at end of each bar
+
+PAGE 4 — NEXT MONTH + ACTION ITEMS:
+
+  Two-column layout (50/50):
+
+    Left column:
+      Label: "NEXT MONTH PIPELINE"
+      
+      Get items from NEXT month using getMonthlyItems()
+      Show:
+        - Total planned: X posts
+        - By Pillar: mini bar chart
+        - By Format: count list
+        - Earliest deadline: date
+      
+      If nextMonthItems.length === 0:
+        Show "No content planned yet for next month"
+        with a call-to-action text
+
+    Right column:
+      Label: "PENDING APPROVALS"
+      List items with status 'pending_approval':
+        POST ID + Topic + Owner + "Waiting X days"
+      If none: "✅ All content approved"
+
+  Section: RECOMMENDATIONS (full width)
+    Label: "STRATEGIC RECOMMENDATIONS"
+    
+    Display array from generateRecommendations() as:
+    Numbered list (1, 2, 3...)
+    Each item:
+      Number: 28px Bold in light gray-200 (decorative)
+      Text: 14px Regular gray-800
+      Small separator line between items
+    
+    Max 5 recommendations shown
+
+  Footer (full width, bottom of page):
+    Left: "Prepared by Content Team · [brandName]"
+    Center: Page indicator "4 of 4"
+    Right: Generated date
+    All in 10px gray-400
+
+─────────────────────────────────────────────────────────────
+STEP 15: CREATE ExportModal.tsx
+─────────────────────────────────────────────────────────────
+
+This is the main entry component. Add an [Export Report] button 
+in the app's SideNav (below navigation links, above New Brief).
+
+ExportModal is a full-screen modal (Dialog from shadcn/ui).
+
+LEFT PANEL (280px, bg-gray-50, border-right):
+  Title: "Export Report" 18px SemiBold
+
+  REPORT TYPE section:
+    Two large toggle cards (radio-style):
+      Card 1: 📅 Weekly Action Plan
+        Description: "7-day schedule + pipeline"
+      Card 2: 📊 Monthly Executive Report
+        Description: "Full analysis + performance"
+    Selected card: border-2 gray-900 bg-white
+
+  PERIOD SELECTION section:
+    If Weekly selected:
+      Label: "Select Week"
+      Week picker: show last 4 weeks + next 4 weeks as options
+      Format: "Week of 2 Jun 2025 (X posts)"
+      
+    If Monthly selected:
+      Label: "Select Month"  
+      Month/Year selector: show last 3 months + next 2 months
+      Format: "June 2025 (X posts)"
+
+  OPTIONS section:
+    Checkboxes (all checked by default):
+      ☑ Include Performance Data
+      ☑ Include Deadline Alerts
+      ☑ Include Recommendations
+      ☑ Show Team Workload
+
+  EXPORT ACTIONS section (bottom of left panel):
+    Primary button [🖨️ Export as PDF]
+      → calls window.print() 
+      → before printing: add PRINT_STYLES to document head
+      → after printing: remove added styles
+    
+    Secondary button [👁️ Preview]
+      → scrolls to the report preview (already visible on right)
+    
+    Text button [Copy share link] (future feature placeholder)
+    
+    Note: "PDF exports best in Chrome or Edge"
+           10px gray-400
+
+RIGHT PANEL (flex-1, overflow-y-auto, bg-white, padding 40px):
+  Scale wrapper: 
+    transform: scale(0.75) 
+    transform-origin: top center
+    This makes A4 report fit the preview panel
+
+  Conditionally render:
+    If Weekly: <WeeklyReport items={...} weekStart={...} brandName={...} />
+    If Monthly: <MonthlyReport items={...} year={...} month={...} brandName={...} />
+
+  Show a "scaled to 75%" notice below:
+    "Preview at 75% — exported PDF will be full size"
+    11px gray-400 text-center
+
+─────────────────────────────────────────────────────────────
+STEP 16: PRINT CSS IMPLEMENTATION
+─────────────────────────────────────────────────────────────
+
+In lib/reportStyles.ts, export this CSS string as PRINT_STYLES:
+
+const PRINT_STYLES = `
+<style id="report-print-styles">
+  @media print {
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+    
+    body * { visibility:
+Copy
+Model Used
+
+In lib/reportStyles.ts, export this CSS string as PRINT_STYLES:
+
+const PRINT_STYLES = `
+<style id="report-print-styles">
+  @media print {
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+
+    /* Hide everything except the report */
+    body * {
+      visibility: hidden;
+    }
+
+    #report-print-root,
+    #report-print-root * {
+      visibility: visible;
+    }
+
+    #report-print-root {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+    }
+
+    /* Reset scale for print — show at 100% */
+    .report-scale-wrapper {
+      transform: none !important;
+      transform-origin: unset !important;
+    }
+
+    /* Page breaks */
+    .page-break {
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .page-break-avoid {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    /* Force background colors to print */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+
+    /* Remove shadows */
+    * {
+      box-shadow: none !important;
+      text-shadow: none !important;
+    }
+
+    /* Normalize border radius */
+    * {
+      border-radius: 4px !important;
+    }
+
+    /* Hide non-printable elements */
+    .no-print,
+    button,
+    [role="dialog"],
+    nav,
+    aside {
+      display: none !important;
+    }
+
+    /* Report page sizing */
+    .report-page {
+      width: 794px;
+      min-height: 1123px;
+      padding: 48px;
+      box-sizing: border-box;
+      background: white;
+      position: relative;
+    }
+
+    /* Monthly report uses landscape for calendar page */
+    .report-page.landscape {
+      width: 1123px;
+      min-height: 794px;
+      padding: 40px 48px;
+    }
+
+    /* Typography normalization for print */
+    body {
+      font-family: "Inter", "Helvetica Neue", Arial, sans-serif !important;
+      font-size: 13px !important;
+      line-height: 1.5 !important;
+      color: #111827 !important;
+    }
+
+    /* Prevent content from being cut across pages */
+    table { page-break-inside: avoid; }
+    tr    { page-break-inside: avoid; }
+    .content-chip-print { page-break-inside: avoid; }
+    .stat-card          { page-break-inside: avoid; }
+    .top-post-card      { page-break-inside: avoid; }
+  }
+</style>
+`
+
+export { PRINT_STYLES }
+
+─────────────────────────────────────────────────────────────
+STEP 17: INJECT PRINT STYLES ON EXPORT
+─────────────────────────────────────────────────────────────
+
+In ExportModal.tsx, implement the handleExport function:
+
+const handleExport = () => {
+  // 1. Inject print styles
+  const styleEl = document.createElement('div')
+  styleEl.innerHTML = PRINT_STYLES
+  document.head.appendChild(styleEl.firstChild as HTMLElement)
+
+  // 2. Add print root ID to the report container
+  const reportEl = document.getElementById('report-print-root')
+
+  // 3. Set correct page orientation via @page rule
+  const orientationStyle = document.createElement('style')
+  orientationStyle.id = 'report-orientation'
+  orientationStyle.innerHTML = reportType === 'monthly'
+    ? `@page { size: A4 portrait; }`
+    : `@page { size: A4 portrait; }`
+  document.head.appendChild(orientationStyle)
+
+  // 4. Small delay to ensure styles are applied before print dialog
+  setTimeout(() => {
+    window.print()
+
+    // 5. Cleanup after print dialog closes
+    const cleanup = () => {
+      document.getElementById('report-print-styles')?.remove()
+      document.getElementById('report-orientation')?.remove()
+      window.removeEventListener('afterprint', cleanup)
+    }
+    window.addEventListener('afterprint', cleanup)
+  }, 300)
+}
+
+─────────────────────────────────────────────────────────────
+STEP 18: TYPOGRAPHY & SPACING UTILITY CLASSES
+─────────────────────────────────────────────────────────────
+
+In lib/reportStyles.ts also export these Tailwind class helpers
+to ensure consistent typography across all report components:
+
+export const RT = {
+  // Section Labels (always uppercase, tracked, small)
+  sectionLabel: "text-[11px] font-medium uppercase tracking-[0.12em] text-gray-400",
+
+  // Section Titles
+  sectionTitle: "text-[18px] font-semibold text-gray-900 leading-tight",
+
+  // Report Title
+  reportTitle: "text-[28px] font-bold text-gray-900 tracking-tight leading-none",
+
+  // Hero Numbers
+  heroNumber: "text-[36px] font-bold tabular-nums leading-none text-gray-900",
+
+  // Card Numbers
+  cardNumber: "text-[24px] font-bold tabular-nums leading-none text-gray-900",
+
+  // Medium Numbers
+  medNumber: "text-[20px] font-bold tabular-nums leading-none",
+
+  // Body Primary
+  body: "text-[13px] font-normal text-gray-700 leading-relaxed",
+
+  // Body Secondary
+  bodyMuted: "text-[12px] font-normal text-gray-500 leading-relaxed",
+
+  // Labels and tags
+  label: "text-[11px] font-medium uppercase tracking-[0.08em]",
+
+  // Caption
+  caption: "text-[10px] font-normal text-gray-400",
+
+  // Table Header
+  tableHeader: "text-[11px] font-medium uppercase tracking-[0.08em] text-gray-500",
+
+  // Table Cell
+  tableCell: "text-[13px] font-normal text-gray-700",
+
+  // Emphasis
+  emphasis: "text-[13px] font-semibold text-gray-900",
+}
+
+// Section wrapper with consistent spacing
+export const SECTION = {
+  wrapper: "mb-8",
+  header: "flex items-center gap-2 mb-4",
+  headerWithLine: "flex items-center gap-3 mb-4 pb-3 border-b border-gray-200",
+  divider: "w-3 h-[2px] bg-gray-900 rounded-full",
+}
+// Usage example:
+// <div className={SECTION.wrapper}>
+//   <div className={SECTION.headerWithLine}>
+//     <div className={SECTION.divider} />
+//     <span className={RT.sectionLabel}>SECTION TITLE</span>
+//   </div>
+//   ... content
+// </div>
+
+─────────────────────────────────────────────────────────────
+STEP 19: FORMAT COMPARISON BAR COMPONENT
+─────────────────────────────────────────────────────────────
+
+Create report-components/FormatComparisonBar.tsx
+
+Props:
+  data: Record<ContentFormat, {
+    avgEngagementRate: number
+    count: number
+  }>
+
+Layout: Vertical list of horizontal bars
+
+For each format (sorted by avgEngagementRate descending):
+
+  Row layout:
+    Left  (100px): Format name (13px SemiBold) + count badge (11px gray-400)
+    Middle (flex-1): 
+      Outer bar: bg-gray-100 rounded-full h-6
+      Inner fill: 
+        width = (value / maxValue) * 100%
+        background = sequential blues:
+          rank 1: #1E40AF (blue-800)
+          rank 2: #2563EB (blue-600)
+          rank 3: #3B82F6 (blue-500)
+          rank 4: #60A5FA (blue-400)
+          rank 5+: #93C5FD (blue-300)
+        transition: width 0.6s ease (screen only)
+        Border-radius: rounded-full
+        Min-width: 32px (show even if value is tiny)
+    Right (64px): 
+      ER value "X.X%" — 13px Bold
+      Color: green-700 if > 8%, amber-700 if 4-8%, red-600 if < 4%
+
+Benchmark line:
+  Below all bars, show a small note:
+  "Industry benchmark: ~5-8% ER for social content"
+  10px gray-400 italic
+
+─────────────────────────────────────────────────────────────
+STEP 20: REPORT FOOTER COMPONENT
+─────────────────────────────────────────────────────────────
+
+Create report-components/ReportFooter.tsx
+
+Props:
+  brandName: string
+  currentPage: number
+  totalPages: number
+  generatedAt: Date
+
+Layout: Full-width footer, height 40px
+  Separated from content by: border-top 1px solid gray-200
+  Padding-top: 12px
+
+  Left: "{brandName} · Content Team"
+        10px gray-400
+
+  Center: "Page {currentPage} of {totalPages}"
+          10px gray-400
+
+  Right: "Generated {format(generatedAt, 'd MMM yyyy · HH:mm')}"
+         10px gray-400
+
+This component is placed at the bottom of EACH report page div.
+
+─────────────────────────────────────────────────────────────
+STEP 21: INTEGRATE EXPORT BUTTON INTO APP
+─────────────────────────────────────────────────────────────
+
+In components/shared/SideNav.tsx:
+
+Add an [Export Report] button between the navigation links
+and the [+ New Brief] button.
+
+Button style:
+  - Full width
+  - Variant: outline (border-gray-200)
+  - Icon: FileDown from lucide-react (16px)
+  - Text: "Export Report"
+  - Font: 13px Medium
+  - Hover: bg-gray-100
+
+onClick: setExportModalOpen(true)
+
+Manage modal open state in SideNav using useState.
+Render <ExportModal open={exportModalOpen} onClose={...} />
+Pass items from useContentStore() to ExportModal.
+
+─────────────────────────────────────────────────────────────
+STEP 22: SEED DATA ADDITIONS FOR TESTING EXPORT
+─────────────────────────────────────────────────────────────
+
+In lib/seedData.ts, ensure seed data includes:
+
+1. At least 8 items with publishDate in the CURRENT month
+   (so Monthly Report shows a populated calendar)
+
+2. At least 3 items with publishDate in the CURRENT week
+   (so Weekly Report shows content)
+
+3. At least 2 items with full PerformanceData filled:
+   Both snapshot24h AND finalMetrics populated
+   With realistic numbers:
+     Reach: 3000–12000
+     EngagementRate: calculated from actual likes/comments/shares/saves
+     SaveRate: 3–12%
+
+4. At least 1 item with status 'revision' 
+   (to test DeadlineAlertSection)
+
+5. At least 1 item with publishedAt set to 15 days ago
+   with NO performance data
+   (to test KPI Reminder in report)
+
+6. Items spread across all 6 pillars with varying counts:
+   sport: 4, fact: 3, mood: 3, 
+   fun_content: 2, micro_wellness: 2, recommend_review: 2
+   (to make PillarDonutChart and KPIScorecard meaningful)
+PART 4 — BUILD ORDER สำหรับ Export System
+unknown
+Copy
+PHASE 1 — Foundation (ทำก่อน ไม่มี Dependency)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 1 : lib/reportStyles.ts  → RT, SECTION, PRINT_STYLES
+Step 2 : lib/reportUtils.ts   → Data functions ทั้งหมด
+Step 3 : Update lib/seedData.ts → ให้ครบตาม Step 22
+
+PHASE 2 — Atomic Components (ทำได้พร้อมกัน)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 4 : ReportHeader.tsx
+Step 5 : ReportFooter.tsx
+Step 6 : ExecSummaryStrip.tsx
+Step 7 : PipelineStatusBar.tsx
+Step 8 : PillarDonutChart.tsx
+Step 9 : FormatComparisonBar.tsx
+Step 10: DeadlineAlertSection.tsx
+
+PHASE 3 — Complex Components (ต้อง Phase 2 ก่อน)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 11: ContentDetailTable.tsx
+Step 12: WeeklyCalendarGrid.tsx  (ใช้ ContentChipPrint)
+Step 13: MonthlyCalendarGrid.tsx (ใช้ ContentChipPrint micro)
+Step 14: KPIScorecardTable.tsx
+Step 15: TopPostsSection.tsx
+Step 16: ActionItemsSection.tsx
+
+PHASE 4 — Report Pages (ต้อง Phase 3 ก่อน)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 17: WeeklyReport.tsx
+Step 18: MonthlyReport.tsx
+
+PHASE 5 — Modal & Integration (ทำสุดท้าย)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 19: ExportModal.tsx
+Step 20: Update SideNav.tsx → ใส่ Export Button
+Step 21: Test print ด้วย Seed Data
+PART 5 — QA CHECKLIST สำหรับ Export System
+unknown
+Copy
+SCREEN PREVIEW
+□ Weekly Report แสดงครบ 2 หน้าใน Preview
+□ Monthly Report แสดงครบ 4 หน้าใน Preview  
+□ Scale 75% ทำให้เห็น A4 proportion ชัดเจน
+□ สีทุก Pillar พิมพ์ออกมาถูกต้อง
+□ ตัวเลขทุกตัวคำนวณถูกต้อง (ตรวจกับ Raw Data)
+□ Empty States แสดงถูกต้องเมื่อไม่มีข้อมูล
+
+PDF OUTPUT
+□ Print Dialog เปิดได้จาก [Export as PDF]
+□ Fonts แสดงถูกต้องใน PDF
+□ Background colors ติดใน PDF (ต้องทดสอบใน Chrome)
+□ Page breaks ถูกต้อง — ไม่มี Content ถูกตัดกลาง
+□ Header และ Footer ปรากฏทุกหน้า
+□ Content ไม่ล้นออกนอก A4 (794px width)
+□ ทดสอบ Print ใน Chrome, Edge, Safari
+
+REPORT CONTENT ACCURACY
+□ ExecSummaryStrip ตัวเลขตรงกับ Dashboard
+□ PillarDonutChart % รวมกันได้ 100%
+□ KPI Scorecard คำนวณ Pass/Fail ถูกต้อง
+□ Top Posts เรียงตาม ER จริงๆ ไม่ใช่ Random
+□ Recommendations สร้างจาก Rule จริง ไม่ Hardcode
+□ Deadline Alerts แสดง Items ที่ถูกต้อง
+
+UX
+□ Modal เปิด/ปิดได้ smooth
+□ เปลี่ยน Week/Month แล้ว Preview อัปเดตทันที
+□ Options checkboxes ส่งผลต่อ Report จริง
+□ "X posts" hint ใน Period Selector ถูกต้อง

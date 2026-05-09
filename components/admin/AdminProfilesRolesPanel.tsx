@@ -22,6 +22,7 @@ import {
   useSupabaseApp,
 } from "@/components/supabase/SupabaseAppProvider";
 import { cn } from "@/lib/utils";
+import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 
 type ProfileRow = {
   id: string;
@@ -101,8 +102,8 @@ export function AdminProfilesRolesPanel() {
             <tbody className="divide-y">
               {loading ? (
                 <tr>
-                  <td colSpan={3} className="p-4 text-muted-foreground">
-                    กำลังโหลด…
+                  <td colSpan={3} className="p-2">
+                    <PageSpinner embedded label="กำลังโหลดโปรไฟล์…" />
                   </td>
                 </tr>
               ) : profiles.length === 0 ? (

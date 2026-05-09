@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import type { StatCardKey } from "@/lib/types";
 import { MaterialIcon } from "@/components/ui/material-icon";
 
@@ -25,8 +24,13 @@ export function StatsCard({
   onPress,
   symbol,
 }: StatsCardProps) {
-  const Icon =
-    trend > 0.02 ? ArrowUpRight : trend < -0.02 ? ArrowDownRight : Minus;
+  const trendUp = trend > 0.02;
+  const trendDown = trend < -0.02;
+  const trendIconName = trendUp
+    ? "trending_up"
+    : trendDown
+      ? "trending_down"
+      : "horizontal_rule";
   const trendLabel = `${Math.abs(Math.round(trend * 100))}%`;
 
   return (
@@ -34,7 +38,7 @@ export function StatsCard({
       type="button"
       onClick={() => onPress?.(statKey)}
       className={cn(
-        "flex flex-1 flex-col rounded-xl border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md min-w-[140px]",
+        "flex min-h-[44px] flex-1 flex-col rounded-xl border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md min-w-[140px]",
         active && "border-primary ring-2 ring-primary/20"
       )}
     >
@@ -44,11 +48,13 @@ export function StatsCard({
       </span>
       <span className="mt-2 text-3xl font-semibold tabular-nums">{value}</span>
       <span className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-        <Icon
+        <MaterialIcon
+          name={trendIconName}
+          size={16}
           className={cn(
-            "h-3.5 w-3.5",
-            trend > 0.02 && "text-emerald-600",
-            trend < -0.02 && "text-red-600"
+            trendUp && "text-emerald-600",
+            trendDown && "text-red-600",
+            !trendUp && !trendDown && "opacity-60"
           )}
         />
         เทียบเดือนก่อน {trendLabel}

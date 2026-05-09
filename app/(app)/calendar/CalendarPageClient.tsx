@@ -26,11 +26,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, ExternalLink, BarChart3, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { MaterialIcon } from "@/components/ui/material-icon";
+import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
+import { EmptyState } from "@/components/ui/feedback/EmptyState";
+import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
 
 export function CalendarPageClient() {
+  const hydrated = useContentStoreHydrated();
   const items = useContentStore((s) => s.items);
   const updateStatus = useContentStore((s) => s.updateStatus);
   const deleteItem = useContentStore((s) => s.deleteItem);
@@ -80,11 +84,19 @@ export function CalendarPageClient() {
     [filtered]
   );
 
+  if (!hydrated) {
+    return (
+      <div className="min-h-[min(60vh,420px)] py-8">
+        <PageSpinner label="กำลังโหลดปฏิทิน…" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Content Calendar</h1>
+          <h1 className="text-2xl font-bold tracking-tight">ปฏิทินคอนเทนต์</h1>
           <p className="text-sm text-muted-foreground">
             ดูแผนตามวันโพสต์ · ลากย้ายวันได้ (มุมมองปฏิทิน)
           </p>
@@ -98,7 +110,7 @@ export function CalendarPageClient() {
               className="h-8"
               onClick={() => setView("calendar")}
             >
-              Calendar
+              ปฏิทิน
             </Button>
             <Button
               type="button"
@@ -107,7 +119,7 @@ export function CalendarPageClient() {
               className="h-8"
               onClick={() => setView("list")}
             >
-              List
+              รายการ
             </Button>
           </div>
         </div>
@@ -188,35 +200,45 @@ export function CalendarPageClient() {
                     <div className="flex justify-end gap-1">
                       <Link
                         href={`/briefs/${item.id}`}
+                        aria-label="เปิดบรีฟ"
                         className={cn(
-                          buttonVariants({ variant: "ghost", size: "icon" })
+                          buttonVariants({ variant: "ghost", size: "icon" }),
+                          "max-md:min-h-11 max-md:min-w-11"
                         )}
                       >
-                        <ClipboardList className="h-4 w-4" />
+                        <MaterialIcon name="assignment" size={20} />
                       </Link>
                       <Link
                         href={`/performance/${item.id}`}
+                        aria-label="ดูผลงาน"
                         className={cn(
-                          buttonVariants({ variant: "ghost", size: "icon" })
+                          buttonVariants({ variant: "ghost", size: "icon" }),
+                          "max-md:min-h-11 max-md:min-w-11"
                         )}
                       >
-                        <BarChart3 className="h-4 w-4" />
+                        <MaterialIcon name="bar_chart" size={20} />
                       </Link>
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label={`ลบ ${item.id}`}
+                        className="max-md:min-h-11 max-md:min-w-11"
                         onClick={() => {
                           deleteItem(item.id);
                           toast.success(`ลบ ${item.id}`, {
                             action: {
-                              label: "Undo",
+                              label: "เลิกทำ",
                               onClick: () =>
                                 useContentStore.getState().undoDelete(),
                             },
                           });
                         }}
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <MaterialIcon
+                          name="delete"
+                          size={20}
+                          className="text-destructive"
+                        />
                       </Button>
                     </div>
                   </TableCell>
@@ -224,14 +246,19 @@ export function CalendarPageClient() {
               ))}
             </TableBody>
           </Table>
-          {!listSorted.length && (
-            <p className="p-8 text-center text-sm text-muted-foreground">
-              ไม่มีโพสต์ในตัวกรองนี้ —{" "}
-              <Link href="/briefs/new" className="underline">
-                สร้าง Brief ใหม่
+          {!listSorted.length ? (
+            <EmptyState
+              compact
+              icon="filter_alt_off"
+              title="ไม่มีรายการตามตัวกรอง"
+              description="ปรับตัวกรองด้านบนหรือสร้างบรีฟใหม่เพื่อวางแผนโพสต์"
+              className="rounded-none border-0 border-t bg-transparent py-10 shadow-none"
+            >
+              <Link href="/briefs/new">
+                <Button size="sm">สร้างบรีฟใหม่</Button>
               </Link>
-            </p>
-          )}
+            </EmptyState>
+          ) : null}
         </div>
       )}
 
@@ -296,9 +323,12 @@ export function CalendarPageClient() {
               <div className="mt-auto flex gap-2 pt-4">
                 <Link
                   href={`/briefs/${selected.id}`}
-                  className={cn(buttonVariants({ className: "flex-1" }))}
+                  className={cn(
+                    buttonVariants({ className: "flex-1 gap-1.5" })
+                  )}
                 >
-                  Open Full Brief <ExternalLink className="ml-1 h-3 w-3" />
+                  เปิดบรีฟเต็ม
+                  <MaterialIcon name="open_in_new" size={16} />
                 </Link>
                 <Link
                   href={`/performance/${selected.id}`}

@@ -10,6 +10,21 @@ export type EmailAllowlistResult =
   | { ok: true }
   | { ok: false; error: AllowlistDenialReason };
 
+/** query ?reason= / login ?error= — ใช้ร่วม middleware + server layout */
+export function allowlistDenialToQueryParam(
+  reason: AllowlistDenialReason
+): string {
+  switch (reason) {
+    case "allowlist_empty":
+      return "allowlist_empty";
+    case "rpc_error":
+      return "allowlist_check_failed";
+    case "no_email":
+    case "email_not_allowlisted":
+      return "email_not_allowlisted";
+  }
+}
+
 /**
  * Allowlist เข้ม (เว็บภายในองค์กร): ทุกคนที่ใช้แอป รวมโหมดดูอย่างเดียว (viewer)
  * ต้องล็อกอินและมีอีเมลใน allowed_emails เมื่อมีอย่างน้อยหนึ่งแถวในตาราง

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
+import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -117,7 +118,7 @@ export function AdminAllowlistPanel() {
         <div className="rounded-lg border">
           <div className="divide-y">
             {loading ? (
-              <p className="p-4 text-sm text-muted-foreground">กำลังโหลด…</p>
+              <PageSpinner embedded label="กำลังโหลดรายการ…" />
             ) : allowed.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">
                 ยังไม่มีรายการ — <strong>ไม่มีใครล็อกอินได้</strong>จนกว่าจะเพิ่มอีเมล

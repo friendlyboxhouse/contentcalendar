@@ -4,12 +4,21 @@ import { useEffect, useLayoutEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 import { ProductionCloudRequired } from "@/components/auth/ProductionCloudRequired";
+import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 
 /**
  * • โปรดักชันโดเมนจริงแต่เซิร์ฟเวอร์ไม่เห็น Supabase env → ProductionCloudRequired
  * • ไม่มี env / ไม่มี session → ไม่เรนเดอร์แอปโฟลเดอร์ (พาไป /login)
  * • เมลไม่ผ่าน allowlist → middleware พาไป /access-blocked (มี session อยู่)
  */
+function AuthWaiting({ label }: { label: string }) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40 px-6">
+      <PageSpinner label={label} />
+    </div>
+  );
+}
+
 export function ClientAuthGate({
   children,
   blockOpenPlannerWithoutCloud = false,
@@ -71,41 +80,17 @@ export function ClientAuthGate({
   /** บังคับให้ไป /login ก่อน — ห้ามโชว์แดชบอร์ดจนกว่าจะตั้งค่า Supabase + มี session */
   if (!configured) {
     if (!authHydrated) {
-      return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-muted/40 px-6">
-          <p className="text-sm text-muted-foreground">
-            กำลังตรวจสอบการเข้าสู่ระบบ…
-          </p>
-        </div>
-      );
+      return <AuthWaiting label="กำลังตรวจสอบการเข้าสู่ระบบ…" />;
     }
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-muted/40 px-6">
-        <p className="text-sm text-muted-foreground">
-          กำลังไปหน้าเข้าสู่ระบบ…
-        </p>
-      </div>
-    );
+    return <AuthWaiting label="กำลังไปหน้าเข้าสู่ระบบ…" />;
   }
 
   if (!authHydrated) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-muted/40 px-6">
-        <p className="text-sm text-muted-foreground">
-          กำลังตรวจสอบการเข้าสู่ระบบ…
-        </p>
-      </div>
-    );
+    return <AuthWaiting label="กำลังตรวจสอบการเข้าสู่ระบบ…" />;
   }
 
   if (!session) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-muted/40 px-6">
-        <p className="text-sm text-muted-foreground">
-          กำลังไปหน้าเข้าสู่ระบบ…
-        </p>
-      </div>
-    );
+    return <AuthWaiting label="กำลังไปหน้าเข้าสู่ระบบ…" />;
   }
 
   return <>{children}</>;

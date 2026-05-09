@@ -24,6 +24,7 @@ import {
   FORMAT_LABELS,
   PLATFORM_LABELS,
   FUNNEL_CONFIG,
+  STATUS_CONFIG,
 } from "@/lib/constants";
 import { useContentStore } from "@/store/contentStore";
 import { createEmptyBrief } from "@/lib/createBrief";
@@ -48,6 +49,16 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
+import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
+import { EmptyState } from "@/components/ui/feedback/EmptyState";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const APPROVAL_ROLE_LABELS: Record<ApprovalTrackRow["role"], string> = {
   creative_lead: "Creative Lead",
@@ -101,6 +112,13 @@ export function BriefDetailClient({ briefId }: Props) {
   const [draft, setDraft] = useState<ContentItem | null>(null);
   const [revNote, setRevNote] = useState("");
   const [revRound, setRevRound] = useState<RevisionRound>("R1");
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [revisionDialogOpen, setRevisionDialogOpen] = useState(false);
+  const [revisionRoundPick, setRevisionRoundPick] =
+    useState<RevisionRound>("R1");
+  const [genericStatusOpen, setGenericStatusOpen] = useState(false);
+  const [pendingGenericStatus, setPendingGenericStatus] =
+    useState<ContentStatus | null>(null);
 
   useEffect(() => {
     if (isNew && seedNewRef.current) {
@@ -160,36 +178,36 @@ export function BriefDetailClient({ briefId }: Props) {
 
   if (!isNew && !existing) {
     return (
-      <div className="space-y-4 p-6">
-        <p className="text-muted-foreground">ไม่พบ Brief นี้</p>
-        <Link
-          href="/briefs"
-          className={cn(buttonVariants({ variant: "outline" }))}
+      <div className="p-4 md:p-6">
+        <EmptyState
+          icon="search_off"
+          title="ไม่พบบรีฟนี้"
+          description="อาจถูกลบแล้ว หรือ POST-ID ไม่ถูกต้อง — ลองกลับไปที่รายการบรีฟ"
         >
-          ← กลับ
-        </Link>
+          <Link
+            href="/briefs"
+            className={cn(buttonVariants({ variant: "outline" }), "no-underline")}
+          >
+            กลับไปรายการบรีฟ
+          </Link>
+        </EmptyState>
       </div>
     );
   }
 
   if (!draft) {
-    return (
-      <div className="p-8 text-sm text-muted-foreground">กำลังโหลด…</div>
-    );
+    return <PageSpinner label="กำลังเปิดบรีฟ…" />;
   }
 
   const setField = <K extends keyof ContentItem>(key: K, val: ContentItem[K]) =>
     setDraft((d) => (d ? { ...d, [key]: val } : d));
 
-  const applyStatus = (next: ContentStatus) => {
-    if (!canEdit) return;
+  const performStatusChange = (
+    next: ContentStatus,
+    revRoundArg?: RevisionRound
+  ) => {
+    if (!draft || !canEdit) return;
     if (next === "published") {
-      if (
-        !confirm(
-          "ตั้งเป็น Published จะเริ่มนับ KPI reminder — ยืนยัน?"
-        )
-      )
-        return;
       if (!isNew) {
         updateStatus(draft.id, "published");
       }
@@ -199,8 +217,7 @@ export function BriefDetailClient({ briefId }: Props) {
       return;
     }
     if (next === "revision") {
-      const round = (prompt("รอบ Revision (R1 / R2 / R3+)", "R1") ||
-        "R1") as RevisionRound;
+      const round = revRoundArg ?? "R1";
       if (!isNew) {
         updateItem(draft.id, { status: next, revisionRound: round });
       }
@@ -214,6 +231,21 @@ export function BriefDetailClient({ briefId }: Props) {
     }
     setField("status", next);
     toast.success("อัปเดตสถานะ");
+  };
+
+  const beginStatusChange = (next: ContentStatus) => {
+    if (!canEdit || !draft) return;
+    if (next === "published") {
+      setPublishDialogOpen(true);
+      return;
+    }
+    if (next === "revision") {
+      setRevisionRoundPick(draft.revisionRound ?? "R1");
+      setRevisionDialogOpen(true);
+      return;
+    }
+    setPendingGenericStatus(next);
+    setGenericStatusOpen(true);
   };
 
   const validate = () => {
@@ -244,11 +276,11 @@ export function BriefDetailClient({ briefId }: Props) {
     };
     if (isNew) {
       addItem(cleaned);
-      toast.success(`✅ บันทึก ${cleaned.id} และเพิ่มใน Calendar แล้ว`);
+      toast.success(`บันทึก ${cleaned.id} และเพิ่มในปฏิทินแล้ว`);
       router.replace(`/briefs/${cleaned.id}`);
     } else {
       updateItem(cleaned.id, cleaned);
-      toast.success(`✅ บันทึก ${cleaned.id}`);
+      toast.success(`บันทึก ${cleaned.id} แล้ว`);
     }
   };
 
@@ -297,7 +329,7 @@ export function BriefDetailClient({ briefId }: Props) {
             href="/briefs"
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
           >
-            ← Back
+            ← กลับ
           </Link>
           <h1 className="flex items-center gap-2 text-xl font-bold">
             <MaterialIcon name="description" size={24} />
@@ -314,12 +346,12 @@ export function BriefDetailClient({ briefId }: Props) {
               )}
             >
               <MaterialIcon name="bar_chart" size={18} />
-              Performance
+              ผลงาน
             </Link>
           )}
           <Button size="sm" onClick={save} disabled={!canEdit} className="gap-1">
             <MaterialIcon name="save" size={18} />
-            Save Brief
+            บันทึกบรีฟ
           </Button>
         </div>
       </div>
@@ -328,7 +360,7 @@ export function BriefDetailClient({ briefId }: Props) {
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
             <MaterialIcon name="timeline" size={18} />
-            Status pipeline
+            ท่อสถานะ
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -338,18 +370,21 @@ export function BriefDetailClient({ briefId }: Props) {
                 <button
                   type="button"
                   disabled={!canEdit}
+                  aria-label={`เปลี่ยนสถานะเป็น ${STATUS_CONFIG[st].label}`}
                   className={cn(
-                    "rounded-full px-2 py-1 text-xs transition disabled:pointer-events-none disabled:opacity-40",
+                    "min-h-10 rounded-full px-3 py-2 text-xs font-medium transition disabled:pointer-events-none disabled:opacity-40",
                     draft.status === st
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted hover:bg-muted/80"
                   )}
-                  onClick={() => {
-                    if (!confirm(`เปลี่ยนสถานะเป็น ${st}?`)) return;
-                    applyStatus(st);
-                  }}
+                  onClick={() => beginStatusChange(st)}
                 >
-                  {st.replace(/_/g, " ")}
+                  <span className="hidden sm:inline">
+                    {STATUS_CONFIG[st].emoji} {STATUS_CONFIG[st].label}
+                  </span>
+                  <span className="sm:hidden" title={STATUS_CONFIG[st].label}>
+                    {STATUS_CONFIG[st].emoji}
+                  </span>
                 </button>
                 {idx < CONTENT_STATUSES_ORDERED.length - 1 && (
                   <span className="text-muted-foreground">→</span>
@@ -855,20 +890,129 @@ export function BriefDetailClient({ briefId }: Props) {
         </CardContent>
       </Card>
 
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 p-4 backdrop-blur md:left-[240px] max-xl:md:left-[72px] max-md:left-0">
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur md:left-[240px] max-xl:md:left-[72px] max-md:left-0">
         <div className="mx-auto flex max-w-5xl justify-end gap-2">
           <Link
             href="/briefs"
             className={cn(buttonVariants({ variant: "outline" }))}
           >
-            Cancel
+            ยกเลิก
           </Link>
           <Button onClick={save} disabled={!canEdit} className="gap-1">
             <MaterialIcon name="save" size={18} />
-            Save Brief
+            บันทึกบรีฟ
           </Button>
         </div>
       </div>
+
+      <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
+        <DialogContent showCloseButton className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>ตั้งเป็น Published?</DialogTitle>
+            <DialogDescription>
+              ระบบจะเริ่มนับ KPI reminder หลังโพสต์ — ตรวจสอบวันที่และข้อมูลให้ครบก่อนยืนยัน
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPublishDialogOpen(false)}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                performStatusChange("published");
+                setPublishDialogOpen(false);
+              }}
+            >
+              ยืนยัน Published
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={revisionDialogOpen} onOpenChange={setRevisionDialogOpen}>
+        <DialogContent showCloseButton className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>เลือกรอบ Revision</DialogTitle>
+            <DialogDescription>
+              เลือกรอบที่สอดคล้องกับงานแก้ไขปัจจุบัน
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap gap-2 py-2">
+            {(["R1", "R2", "R3+"] as RevisionRound[]).map((r) => (
+              <Button
+                key={r}
+                type="button"
+                variant={revisionRoundPick === r ? "default" : "outline"}
+                size="sm"
+                className="min-w-[4rem]"
+                onClick={() => setRevisionRoundPick(r)}
+              >
+                {r}
+              </Button>
+            ))}
+          </div>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRevisionDialogOpen(false)}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                performStatusChange("revision", revisionRoundPick);
+                setRevisionDialogOpen(false);
+              }}
+            >
+              ยืนยัน Revision
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={genericStatusOpen} onOpenChange={setGenericStatusOpen}>
+        <DialogContent showCloseButton className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>เปลี่ยนสถานะ?</DialogTitle>
+            <DialogDescription>
+              {pendingGenericStatus
+                ? `เปลี่ยนเป็น “${STATUS_CONFIG[pendingGenericStatus].label}”`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setGenericStatusOpen(false);
+                setPendingGenericStatus(null);
+              }}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (pendingGenericStatus) {
+                  performStatusChange(pendingGenericStatus);
+                }
+                setGenericStatusOpen(false);
+                setPendingGenericStatus(null);
+              }}
+            >
+              ยืนยัน
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

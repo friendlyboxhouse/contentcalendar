@@ -27,8 +27,8 @@ import {
   summarizeKPIResults,
   enrichPerformanceFromFinalMetrics,
 } from "@/lib/kpi";
-import { ChevronDown, Star } from "lucide-react";
 import { toast } from "sonner";
+import { MaterialIcon } from "@/components/ui/material-icon";
 
 function emptyMetrics(): MetricsSnapshot {
   return {
@@ -96,7 +96,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
           href="/performance"
           className={cn(buttonVariants({ variant: "outline" }))}
         >
-          ← Back
+          ← กลับ
         </Link>
       </div>
     );
@@ -214,7 +214,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
       next = { ...next, status: "published" };
     }
     updateItem(base.id, next);
-    toast.success(`📊 Review saved for ${base.id}`);
+    toast.success(`บันทึกการรีวิว ${base.id} แล้ว`);
   };
 
   return (
@@ -225,18 +225,19 @@ export function PerformanceDetailClient({ id }: { id: string }) {
             href="/performance"
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
           >
-            ← Back
+            ← กลับ
           </Link>
-          <h1 className="text-xl font-bold">{base.id} Performance</h1>
+          <h1 className="text-xl font-bold">{base.id} · ผลงาน</h1>
         </div>
         <Button size="sm" onClick={save}>
-          Save Review
+          บันทึกการรีวิว
         </Button>
       </div>
 
       <Collapsible defaultOpen>
-        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-semibold">
-          Brief summary <ChevronDown className="h-4 w-4" />
+        <CollapsibleTrigger className="flex min-h-11 items-center gap-2 text-sm font-semibold">
+          สรุปบรีฟ{" "}
+          <MaterialIcon name="expand_more" size={20} className="opacity-70" />
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-3 space-y-2 rounded-xl border bg-card p-4 text-sm">
           <div className="flex flex-wrap gap-2">
@@ -258,15 +259,15 @@ export function PerformanceDetailClient({ id }: { id: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">KPI reminder status</CardTitle>
+          <CardTitle className="text-sm">สถานะ KPI reminder</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {reminderRows.map((row) => (
             <div key={row.label} className="flex flex-wrap justify-between gap-2">
               <span>{row.label}</span>
               <span className="text-muted-foreground">
-                {row.state === "done" && "✅ Done"}
-                {row.state === "due" && "🔔 Due"}
+                {row.state === "done" && "เสร็จแล้ว"}
+                {row.state === "due" && "ถึงกำหนด"}
                 {row.state === "pending" && row.date && (
                   <CountdownTimer targetDate={row.date} compact />
                 )}
@@ -279,14 +280,14 @@ export function PerformanceDetailClient({ id }: { id: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Snapshot — 24 hours</CardTitle>
+          <CardTitle className="text-sm">สแนปช็อต — 24 ชม.</CardTitle>
         </CardHeader>
         <CardContent>{metricInputs(snap24, setSnap24)}</CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Final metrics — 7 days</CardTitle>
+          <CardTitle className="text-sm">ตัวเลขสุดท้าย — 7 วัน</CardTitle>
         </CardHeader>
         <CardContent>
           {metricInputs(finalM, setFinalM)}
@@ -298,7 +299,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">KPI scorecard</CardTitle>
+          <CardTitle className="text-sm">สกอร์การ์ด KPI</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {Object.entries(kpiRows).map(([key, row]) => (
@@ -307,7 +308,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
                 <span>{key}</span>
                 <span>
                   Target {row.target} · Actual {row.actual}{" "}
-                  {row.passed ? "✅" : "❌"} ({row.delta > 0 ? "+" : ""}
+                  {row.passed ? "ผ่าน" : "ไม่ผ่าน"} ({row.delta > 0 ? "+" : ""}
                   {row.delta})
                 </span>
               </div>
@@ -322,21 +323,25 @@ export function PerformanceDetailClient({ id }: { id: string }) {
           <Separator />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">
-              {summary.total ? `${summary.passed}/${summary.total} KPIs passed` : "—"}
+              {summary.total
+                ? `ผ่าน KPI ${summary.passed}/${summary.total}`
+                : "—"}
             </span>
             <div className="flex gap-1">
               {([1, 2, 3, 4, 5] as const).map((r) => (
                 <button
                   key={r}
                   type="button"
+                  aria-label={`ให้คะแนน ${r} จาก 5`}
                   onClick={() => setRating(r)}
-                  className="rounded-sm border border-transparent p-1 hover:bg-muted"
+                  className="rounded-sm border border-transparent p-2 hover:bg-muted max-md:min-h-11 max-md:min-w-11 max-md:p-0"
                 >
-                  <Star
+                  <MaterialIcon
+                    name="star"
+                    size={26}
+                    filled={r <= rating}
                     className={
-                      r <= rating
-                        ? "h-6 w-6 fill-amber-400 text-amber-400"
-                        : "h-6 w-6 text-muted-foreground"
+                      r <= rating ? "text-amber-500" : "text-muted-foreground"
                     }
                   />
                 </button>
@@ -348,11 +353,11 @@ export function PerformanceDetailClient({ id }: { id: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Insight & next action</CardTitle>
+          <CardTitle className="text-sm">ข้อคิดและขั้นตอนถัดไป</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div>
-            <Label>💪 What worked</Label>
+            <Label>สิ่งที่ทำได้ดี</Label>
             <Textarea
               rows={4}
               value={whatWorked}
@@ -361,7 +366,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
             />
           </div>
           <div>
-            <Label>📉 What didn&apos;t work</Label>
+            <Label>สิ่งที่ยังไม่โดน</Label>
             <Textarea
               rows={4}
               value={whatDidnt}
@@ -370,7 +375,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
             />
           </div>
           <div>
-            <Label>🎯 Next action</Label>
+            <Label>แผนถัดไป</Label>
             <Textarea
               rows={4}
               value={nextAction}
@@ -381,15 +386,15 @@ export function PerformanceDetailClient({ id }: { id: string }) {
         </CardContent>
       </Card>
 
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 p-4 backdrop-blur md:left-[240px] max-xl:md:left-[72px] max-md:left-0">
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur md:left-[240px] max-xl:md:left-[72px] max-md:left-0">
         <div className="mx-auto flex max-w-5xl justify-end gap-2">
           <Link
             href="/performance"
             className={cn(buttonVariants({ variant: "outline" }))}
           >
-            Close
+            ปิด
           </Link>
-          <Button onClick={save}>Save Review</Button>
+          <Button onClick={save}>บันทึกการรีวิว</Button>
         </div>
       </div>
     </div>

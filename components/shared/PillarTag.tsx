@@ -1,9 +1,8 @@
 "use client";
 
-import type { ComponentType } from "react";
 import { PILLAR_CONFIG } from "@/lib/constants";
 import type { ContentPillar } from "@/lib/types";
-import * as Icons from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { cn } from "@/lib/utils";
 
 interface PillarTagProps {
@@ -20,9 +19,7 @@ export function PillarTag({
   className,
 }: PillarTagProps) {
   const config = PILLAR_CONFIG[pillar];
-  const IconComponent = Icons[config.icon as keyof typeof Icons] as
-    | ComponentType<{ className?: string }>
-    | undefined;
+  const iconSize = size === "sm" ? 14 : 16;
   const sizeClass =
     size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm";
 
@@ -39,9 +36,13 @@ export function PillarTag({
         borderLeft: `3px solid ${config.color}`,
       }}
     >
-      {showIcon && IconComponent && (
-        <IconComponent className="h-3 w-3 shrink-0" />
-      )}
+      {showIcon ? (
+        <MaterialIcon
+          name={config.icon}
+          size={iconSize}
+          className="shrink-0 opacity-90"
+        />
+      ) : null}
       {config.label}
     </span>
   );

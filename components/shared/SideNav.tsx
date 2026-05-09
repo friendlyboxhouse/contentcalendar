@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, FileDown, Plus } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -18,15 +17,38 @@ import { useEffect, useState } from "react";
 import { ExportModal } from "@/components/export/ExportModal";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const DEMO_KEY = "content-planner-demo-seeded-v1";
 
-const nav = [
-  { href: "/", label: "Dashboard", symbol: "dashboard" },
-  { href: "/calendar", label: "Calendar", symbol: "calendar_month" },
-  { href: "/briefs", label: "Content Briefs", symbol: "assignment" },
-  { href: "/performance", label: "Performance", symbol: "analytics" },
-  { href: "/settings", label: "ตั้งค่า", symbol: "settings" },
+const nav: {
+  href: string;
+  label: string;
+  mobileLabel: string;
+  symbol: string;
+}[] = [
+  { href: "/", label: "ภาพรวม", mobileLabel: "ภาพรวม", symbol: "dashboard" },
+  { href: "/calendar", label: "ปฏิทิน", mobileLabel: "ปฏิทิน", symbol: "calendar_month" },
+  {
+    href: "/briefs",
+    label: "คอนเทนต์บรีฟ",
+    mobileLabel: "บรีฟ",
+    symbol: "assignment",
+  },
+  {
+    href: "/performance",
+    label: "ประสิทธิภาพ",
+    mobileLabel: "สถิติ",
+    symbol: "analytics",
+  },
+  { href: "/settings", label: "ตั้งค่า", mobileLabel: "ตั้งค่า", symbol: "settings" },
 ];
 
 export function SideNav() {
@@ -34,6 +56,7 @@ export function SideNav() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [demoResetOpen, setDemoResetOpen] = useState(false);
   const items = useContentStore((s) => s.items);
   const seedFromDemo = useContentStore((s) => s.seedFromDemo);
   const {
@@ -49,33 +72,43 @@ export function SideNav() {
 
   useEffect(() => setMounted(true), []);
 
-  const resetDemo = () => {
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm("โหลดข้อมูลตัวอย่างใหม่ทั้งหมด? การแก้ไขปัจจุบันจะถูกแทนที่")
-    )
-      return;
+  const confirmDemoReset = () => {
     seedFromDemo(true);
     if (typeof window !== "undefined") {
       localStorage.setItem(DEMO_KEY, "1");
     }
+    setDemoResetOpen(false);
   };
+
+  const links = [
+    ...nav,
+    ...(configured && session && canAccessAdmin
+      ? ([
+          {
+            href: "/admin",
+            label: "หลังบ้าน",
+            mobileLabel: "หลังบ้าน",
+            symbol: "admin_panel_settings",
+          },
+        ] as const)
+      : []),
+  ];
 
   return (
     <aside
       className={cn(
         "fixed inset-y-0 left-0 z-40 flex w-[240px] flex-col border-r bg-sidebar text-sidebar-foreground",
         "max-xl:w-[72px] max-xl:items-center max-xl:px-2 max-xl:py-4",
-        "max-md:bottom-0 max-md:top-auto max-md:h-14 max-md:w-full max-md:flex-row max-md:justify-around max-md:border-t max-md:border-r-0"
+        "max-md:bottom-0 max-md:top-auto max-md:min-h-[64px] max-md:h-auto max-md:w-full max-md:flex-row max-md:justify-around max-md:border-t max-md:border-r-0 max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))]"
       )}
     >
-      <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4 max-xl:items-center max-md:flex-row max-md:gap-2 max-md:p-2 max-md:overflow-visible">
+      <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4 max-xl:items-center max-md:flex-row max-md:gap-1 max-md:p-2 max-md:overflow-visible max-md:justify-between">
         <div className="flex items-center gap-2 px-1 max-xl:hidden max-md:hidden">
           <MaterialIcon name="event_available" size={32} className="text-primary" />
           <div>
             <div className="text-sm font-semibold leading-tight">Content Planner</div>
             <div
-              className="max-w-[180px] truncate text-[10px] text-muted-foreground"
+              className="max-w-[180px] truncate text-xs leading-snug text-muted-foreground"
               title={organizationTagline || organizationName}
             >
               {organizationTagline || organizationName}
@@ -83,37 +116,30 @@ export function SideNav() {
           </div>
         </div>
 
-        <nav className="flex flex-col gap-1 max-xl:w-full max-md:flex-row max-md:justify-center">
-          {[
-            ...nav,
-            ...(configured && session && canAccessAdmin
-              ? ([
-                  {
-                    href: "/admin",
-                    label: "หลังบ้าน",
-                    symbol: "admin_panel_settings",
-                  },
-                ] as const)
-              : []),
-          ].map(({ href, label, symbol }) => {
+        <nav className="flex flex-col gap-1 max-xl:w-full max-md:flex-1 max-md:flex-row max-md:justify-stretch max-md:gap-0">
+          {links.map(({ href, label, mobileLabel, symbol }) => {
             const active =
-              href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(href);
+              href === "/" ? pathname === "/" : pathname.startsWith(href);
             return (
               <Link
                 key={href}
                 href={href}
                 title={label}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors max-xl:justify-center max-xl:px-2 max-md:px-2",
+                  "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  "xl:py-2",
+                  "max-xl:justify-center max-xl:px-2 max-xl:rounded-lg",
+                  "max-md:flex max-md:min-h-[52px] max-md:min-w-[44px] max-md:flex-1 max-md:flex-col max-md:justify-center max-md:gap-1 max-md:px-1 max-md:py-2",
                   active
-                    ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900"
-                    : "hover:bg-sidebar-accent"
+                    ? "bg-primary text-primary-foreground shadow-sm dark:bg-white dark:text-slate-900"
+                    : "hover:bg-sidebar-accent max-md:active:scale-[0.98]"
                 )}
               >
-                <MaterialIcon name={symbol} className="shrink-0" size={22} />
-                <span className="max-xl:hidden max-md:hidden">{label}</span>
+                <MaterialIcon name={symbol} className="shrink-0" size={24} />
+                <span className="hidden xl:inline">{label}</span>
+                <span className="hidden max-md:block max-w-[4.25rem] truncate text-center text-[11px] font-semibold leading-tight xl:hidden">
+                  {mobileLabel}
+                </span>
               </Link>
             );
           })}
@@ -123,11 +149,11 @@ export function SideNav() {
           type="button"
           variant="outline"
           size="sm"
-          className="no-print w-full justify-start gap-2 border-gray-200 text-[13px] font-medium hover:bg-gray-100 max-xl:px-2 max-md:hidden"
+          className="no-print w-full justify-start gap-2 border-border text-[13px] font-medium hover:bg-muted max-xl:px-2 max-md:hidden"
           onClick={() => setExportOpen(true)}
         >
-          <FileDown className="h-4 w-4 shrink-0" />
-          <span className="max-xl:hidden">Export Report</span>
+          <MaterialIcon name="file_download" size={18} className="shrink-0" />
+          <span className="max-xl:hidden">ส่งออกรายงาน</span>
         </Button>
 
         <ExportModal
@@ -138,6 +164,29 @@ export function SideNav() {
           reportFooterNote={reportFooterNote}
         />
 
+        <Dialog open={demoResetOpen} onOpenChange={setDemoResetOpen}>
+          <DialogContent showCloseButton className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>รีเซ็ตข้อมูลตัวอย่าง?</DialogTitle>
+              <DialogDescription>
+                การแก้ไขปัจจุบันจะถูกแทนที่ด้วยชุดข้อมูลตัวอย่าง — ดำเนินการต่อเมื่อแน่ใจ
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDemoResetOpen(false)}
+              >
+                ยกเลิก
+              </Button>
+              <Button type="button" onClick={confirmDemoReset}>
+                รีเซ็ตข้อมูลตัวอย่าง
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Link
           href="/briefs/new"
           className={cn(
@@ -145,14 +194,14 @@ export function SideNav() {
             "max-md:hidden"
           )}
         >
-          <Plus className="h-4 w-4" />
-          <span className="max-xl:hidden">New Brief</span>
+          <MaterialIcon name="add_circle" size={18} className="shrink-0" />
+          <span className="max-xl:hidden">สร้างบรีฟใหม่</span>
         </Link>
 
         <div className="space-y-3 max-md:hidden">
-          <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground max-xl:hidden">
+          <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground max-xl:hidden">
             <MaterialIcon name="category" size={14} />
-            Pillars
+            หมวดคอนเทนต์
           </p>
           <ul className="space-y-1.5 max-xl:space-y-2">
             {(Object.keys(PILLAR_CONFIG) as ContentPillar[]).map((key) => {
@@ -175,12 +224,12 @@ export function SideNav() {
         </div>
 
         <Collapsible defaultOpen={false} className="max-md:hidden">
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-sidebar-accent">
+          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-sidebar-accent min-h-10">
             <span className="flex items-center gap-1 max-xl:hidden">
               <MaterialIcon name="flag" size={14} />
               สถานะ
             </span>
-            <ChevronDown className="h-4 w-4 max-xl:hidden" />
+            <MaterialIcon name="expand_more" size={18} className="max-xl:hidden opacity-70" />
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-2 space-y-1">
             {CONTENT_STATUSES_ORDERED.map((key) => {
@@ -214,17 +263,17 @@ export function SideNav() {
                     {displayName ?? session.user.email ?? session.user.id.slice(0, 8)}
                   </div>
                   {displayName && session.user.email && (
-                    <div className="truncate text-[10px] text-muted-foreground">
+                    <div className="truncate text-xs text-muted-foreground">
                       {session.user.email}
                     </div>
                   )}
-                  <div className="text-[10px] text-muted-foreground">ซิงค์คลาวด์เปิดอยู่</div>
+                  <div className="text-xs text-muted-foreground">ซิงค์คลาวด์เปิดอยู่</div>
                 </div>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full gap-1.5 text-xs"
+                className="w-full gap-1.5 text-xs min-h-9"
                 type="button"
                 onClick={() => void signOut()}
               >
@@ -237,7 +286,7 @@ export function SideNav() {
             <Button
               variant="outline"
               size="sm"
-              className="w-full justify-start gap-2"
+              className="w-full justify-start gap-2 min-h-9"
               type="button"
               onClick={() =>
                 setTheme(resolvedTheme === "dark" ? "light" : "dark")
@@ -254,13 +303,13 @@ export function SideNav() {
           )}
           <button
             type="button"
-            className="flex w-full items-center gap-1 text-left text-[11px] text-muted-foreground underline-offset-2 hover:underline max-xl:hidden"
-            onClick={resetDemo}
+            className="flex min-h-11 w-full items-center gap-1 rounded-lg px-2 text-left text-xs text-muted-foreground underline-offset-2 hover:bg-sidebar-accent hover:underline max-xl:hidden"
+            onClick={() => setDemoResetOpen(true)}
           >
             <MaterialIcon name="restart_alt" size={14} />
-            Reset เป็นข้อมูลตัวอย่าง
+            รีเซ็ตข้อมูลตัวอย่าง
           </button>
-          <div className="text-[10px] text-muted-foreground max-xl:hidden">
+          <div className="text-xs text-muted-foreground max-xl:hidden">
             v1.1.0
           </div>
         </div>

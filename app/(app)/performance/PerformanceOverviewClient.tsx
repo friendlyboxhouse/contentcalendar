@@ -6,7 +6,11 @@ import type { ContentPillar, PlannerFilters } from "@/lib/types";
 import { useContentStore } from "@/store/contentStore";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { MaterialIcon } from "@/components/ui/material-icon";
+import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
+import { EmptyState } from "@/components/ui/feedback/EmptyState";
+import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
 import { cn } from "@/lib/utils";
 import { PillarTag } from "@/components/shared/PillarTag";
 import { Badge } from "@/components/ui/badge";
@@ -16,9 +20,9 @@ import {
   calcSaveRate,
 } from "@/lib/utils";
 import { filterContentItems } from "@/lib/filterContent";
-import { Star } from "lucide-react";
 
 export function PerformanceOverviewClient() {
+  const hydrated = useContentStoreHydrated();
   const items = useContentStore((s) => s.items);
   const [filters, setFilters] = useState<PlannerFilters>({
     pillar: "all",
@@ -114,10 +118,18 @@ export function PerformanceOverviewClient() {
     return Math.round((passedK / totalK) * 100);
   }, [reviewed]);
 
+  if (!hydrated) {
+    return (
+      <div className="min-h-[min(60vh,420px)] py-8">
+        <PageSpinner label="กำลังโหลดผลงาน…" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Performance</h1>
+        <h1 className="text-2xl font-bold tracking-tight">ประสิทธิภาพ</h1>
         <p className="text-sm text-muted-foreground">
           ดูผลหลังโพสต์และ KPI scorecard
         </p>
@@ -132,7 +144,7 @@ export function PerformanceOverviewClient() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-1 text-xs font-medium text-muted-foreground">
-            Published ทั้งหมด
+            โพสต์แล้วทั้งหมด
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
             {published.length}
@@ -140,13 +152,13 @@ export function PerformanceOverviewClient() {
         </Card>
         <Card>
           <CardHeader className="pb-1 text-xs font-medium text-muted-foreground">
-            Avg Engagement Rate
+            Engagement เฉลี่ย
           </CardHeader>
           <CardContent className="text-2xl font-semibold">{avgER}%</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-1 text-xs font-medium text-muted-foreground">
-            Top pillar (avg ER)
+            Pillar สูงสุด (ER เฉลี่ย)
           </CardHeader>
           <CardContent className="text-sm font-semibold">
             {pillarBest.pillar ? (
@@ -164,7 +176,7 @@ export function PerformanceOverviewClient() {
         </Card>
         <Card>
           <CardHeader className="pb-1 text-xs font-medium text-muted-foreground">
-            KPI pass rate
+            อัตราผ่าน KPI
           </CardHeader>
           <CardContent className="text-2xl font-semibold">{passRate}%</CardContent>
         </Card>
@@ -210,14 +222,14 @@ export function PerformanceOverviewClient() {
                   {item.topic}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Published{" "}
+                  โพสต์เมื่อ{" "}
                   {item.publishedAt
                     ? new Date(item.publishedAt).toLocaleDateString("th-TH")
                     : "—"}
                 </p>
                 {pendingKpi ? (
                   <Badge variant="secondary" className="w-fit bg-amber-100 text-amber-900">
-                    ⏰ KPI Review Pending
+                    รอรีวิว KPI
                   </Badge>
                 ) : total ? (
                   <Badge
@@ -228,29 +240,30 @@ export function PerformanceOverviewClient() {
                         : "bg-amber-100 text-amber-900"
                     }
                   >
-                    {passed}/{total} KPIs
+                    KPI {passed}/{total}
                   </Badge>
                 ) : (
-                  <Badge variant="outline">ยังไม่มี scorecard</Badge>
+                  <Badge variant="outline">ยังไม่มีสกอร์การ์ด</Badge>
                 )}
               </CardHeader>
               <CardContent className="mt-auto space-y-3 text-sm">
                 <div>
-                  <div className="text-xs text-muted-foreground">Engagement Rate</div>
+                  <div className="text-xs text-muted-foreground">อัตรา Engagement</div>
                   <div className="text-xl font-semibold tabular-nums">{er.toFixed(1)}%</div>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Save rate</span>
+                  <span>อัตรา Save</span>
                   <span className="font-medium text-foreground">{sr.toFixed(1)}%</span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5" aria-label={`คะแนน ${rating} จาก 5`}>
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
+                    <MaterialIcon
                       key={i}
+                      name="star"
+                      size={18}
+                      filled={i < rating}
                       className={
-                        i < rating
-                          ? "h-4 w-4 fill-amber-400 text-amber-400"
-                          : "h-4 w-4 text-muted-foreground"
+                        i < rating ? "text-amber-500" : "text-muted-foreground"
                       }
                     />
                   ))}
@@ -265,7 +278,7 @@ export function PerformanceOverviewClient() {
                     })
                   )}
                 >
-                  {pendingKpi ? "Fill Review →" : "View Review →"}
+                  {pendingKpi ? "กรอกการรีวิว →" : "ดูการรีวิว →"}
                 </Link>
               </CardContent>
             </Card>
@@ -273,11 +286,19 @@ export function PerformanceOverviewClient() {
         })}
       </div>
 
-      {!filtered.length && (
-        <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-          ยังไม่มีคอนเทนต์ที่โพสต์ในตัวกรองนี้ 📭
-        </div>
-      )}
+      {!filtered.length ? (
+        <EmptyState
+          icon="analytics"
+          title="ไม่มีคอนเทนต์ในตัวกรองนี้"
+          description="แสดงเฉพาะคอนเทนต์ที่โพสต์แล้ว (published / kpi_pending) — ปรับตัวกรองหรืออัปเดตสถานะและผลวัด"
+        >
+          <Link href="/briefs">
+            <Button variant="outline" size="sm">
+              ไปที่บรีฟทั้งหมด
+            </Button>
+          </Link>
+        </EmptyState>
+      ) : null}
     </div>
   );
 }

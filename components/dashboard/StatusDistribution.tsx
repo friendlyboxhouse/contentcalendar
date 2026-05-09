@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import type { ContentItem } from "@/lib/types";
 import { STATUS_CONFIG, CONTENT_STATUSES_ORDERED } from "@/lib/constants";
+import { EmptyState } from "@/components/ui/feedback/EmptyState";
 
 export function StatusDistribution({ items }: { items: ContentItem[] }) {
   const data = CONTENT_STATUSES_ORDERED.map((key) => ({
@@ -19,6 +20,18 @@ export function StatusDistribution({ items }: { items: ContentItem[] }) {
     count: items.filter((i) => i.status === key).length,
     fill: STATUS_CONFIG[key].color,
   }));
+
+  if (!items.length) {
+    return (
+      <EmptyState
+        compact
+        icon="bar_chart"
+        title="ยังไม่มีการกระจายสถานะ"
+        description="เพิ่มบรีฟและอัปเดตสถานะเพื่อดูแผนภูมิ"
+        className="h-[320px] min-h-[280px] border-solid bg-card shadow-sm"
+      />
+    );
+  }
 
   return (
     <div className="h-[320px] min-h-[280px] min-w-0 rounded-xl border bg-card p-4 shadow-sm">

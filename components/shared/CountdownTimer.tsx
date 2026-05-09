@@ -1,7 +1,7 @@
 "use client";
 
 import { getCountdown, COUNTDOWN_COLORS } from "@/lib/utils";
-import { Clock, AlertTriangle } from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { cn } from "@/lib/utils";
 
 interface CountdownTimerProps {
@@ -22,12 +22,21 @@ export function CountdownTimer({
 
   if (compact) {
     return (
-      <span className={cn("text-xs font-medium", colors.text, className)}>
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 text-xs font-medium",
+          colors.text,
+          className
+        )}
+      >
+        {isOverdue ? (
+          <MaterialIcon name="warning" size={14} className="shrink-0 opacity-90" />
+        ) : null}
         {isOverdue
-          ? `⚠️ ${days}วัน`
+          ? `${days} วันเกินกำหนด`
           : days === 0
-            ? `${hours}ชม.`
-            : `${days}วัน`}
+            ? `${hours} ชม.`
+            : `${days} วัน`}
       </span>
     );
   }
@@ -42,9 +51,9 @@ export function CountdownTimer({
       )}
     >
       {urgency === "overdue" ? (
-        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+        <MaterialIcon name="warning" size={16} className="shrink-0" />
       ) : (
-        <Clock className="h-3.5 w-3.5 shrink-0" />
+        <MaterialIcon name="schedule" size={16} className="shrink-0 opacity-80" />
       )}
       <span>
         {label && `${label}: `}

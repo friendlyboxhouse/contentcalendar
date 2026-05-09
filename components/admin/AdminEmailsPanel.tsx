@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
+import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -114,7 +115,7 @@ export function AdminEmailsPanel() {
         <div className="rounded-lg border">
           <div className="divide-y">
             {loading ? (
-              <p className="p-4 text-sm text-muted-foreground">กำลังโหลด…</p>
+              <PageSpinner embedded label="กำลังโหลดรายการ…" />
             ) : admins.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">
                 ยังไม่มีแอดมินในตาราง — รัน SQL เพิ่มแถวแรกใน Supabase ก่อน

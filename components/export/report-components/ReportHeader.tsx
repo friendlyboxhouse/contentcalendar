@@ -1,7 +1,7 @@
 "use client";
 
 import { format, endOfWeek, getISOWeek } from "date-fns";
-import { Calendar } from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
 
 interface ReportHeaderProps {
   brandName: string;
@@ -59,7 +59,11 @@ export function ReportHeader({
           <span className="text-[12px] font-medium text-gray-600">
             {format(generatedAt, "d MMM yyyy")}
           </span>
-          <Calendar className="h-4 w-4 shrink-0 text-gray-400" aria-hidden />
+          <MaterialIcon
+            name="calendar_month"
+            size={18}
+            className="shrink-0 text-gray-400"
+          />
         </div>
       </div>
     </header>

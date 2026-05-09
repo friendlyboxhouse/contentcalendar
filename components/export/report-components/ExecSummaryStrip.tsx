@@ -1,25 +1,16 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
-import {
-  BarChart3,
-  Calendar,
-  CheckCircle,
-  Clock,
-  Layers,
-  Send,
-  TrendingDown,
-  TrendingUp,
-} from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { cn } from "@/lib/utils";
 
-const ICONS: Record<string, LucideIcon> = {
-  calendar: Calendar,
-  layers: Layers,
-  clock: Clock,
-  send: Send,
-  check: CheckCircle,
-  chart: BarChart3,
+/** ชื่อไอคอน Material Symbols (ligature) — map เดิมจาก exec stats */
+const STAT_ICON_NAMES: Record<string, string> = {
+  calendar: "calendar_month",
+  layers: "layers",
+  clock: "schedule",
+  send: "send",
+  check: "check_circle",
+  chart: "bar_chart",
 };
 
 export interface ExecStatCard {
@@ -51,7 +42,8 @@ export function ExecSummaryStrip({
   return (
     <div className={cn("grid gap-3", grid)}>
       {stats.map((s, i) => {
-        const Icon = s.icon ? ICONS[s.icon] : undefined;
+        const iconName =
+          s.icon && STAT_ICON_NAMES[s.icon] ? STAT_ICON_NAMES[s.icon] : null;
         const trendUp = s.trend !== undefined && s.trend >= 0;
         return (
           <div
@@ -64,14 +56,16 @@ export function ExecSummaryStrip({
             )}
           >
             <div className="flex items-center gap-2">
-              {Icon && (
-                <Icon
+              {iconName ? (
+                <MaterialIcon
+                  name={iconName}
+                  size={18}
                   className={cn(
-                    "h-4 w-4 shrink-0",
+                    "shrink-0",
                     s.highlight ? "text-gray-300" : "text-gray-400"
                   )}
                 />
-              )}
+              ) : null}
               <span
                 className={cn(
                   "muted text-[11px] font-medium uppercase tracking-[0.08em]",
@@ -98,11 +92,13 @@ export function ExecSummaryStrip({
             </div>
             {s.trend !== undefined && s.trendLabel && (
               <div className="mt-2 flex items-center gap-1 text-[11px]">
-                {trendUp ? (
-                  <TrendingUp className="h-3.5 w-3.5 text-green-600" />
-                ) : (
-                  <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-                )}
+                <MaterialIcon
+                  name={trendUp ? "trending_up" : "trending_down"}
+                  size={16}
+                  className={
+                    trendUp ? "text-green-600" : "text-red-500"
+                  }
+                />
                 <span
                   className={cn(
                     "font-semibold",

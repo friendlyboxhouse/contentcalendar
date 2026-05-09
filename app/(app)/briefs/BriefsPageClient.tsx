@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useContentStore } from "@/store/contentStore";
 import type { ContentStatus, PlannerFilters } from "@/lib/types";
 import { FilterBar } from "@/components/shared/FilterBar";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { PillarTag } from "@/components/shared/PillarTag";
@@ -19,10 +19,12 @@ import {
   PILLAR_CONFIG,
 } from "@/lib/constants";
 import { filterContentItems } from "@/lib/filterContent";
-import { Copy, Trash2, ArrowRight } from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { toast } from "sonner";
-import { generatePostId } from "@/lib/utils";
+import { cn, generatePostId } from "@/lib/utils";
 import { reviveContentItem } from "@/lib/revive";
+import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
+import { EmptyState } from "@/components/ui/feedback/EmptyState";
 
 function BriefsInner() {
   const router = useRouter();
@@ -91,13 +93,13 @@ function BriefsInner() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Content Briefs</h1>
+          <h1 className="text-2xl font-bold tracking-tight">คอนเทนต์บรีฟ</h1>
           <p className="text-sm text-muted-foreground">
-            ศูนย์กลาง Brief · Sync กับ Calendar อัตโนมัติ
+            ศูนย์กลางบรีฟ · เชื่อมกับปฏิทินอัตโนมัติ
           </p>
         </div>
         <Link href="/briefs/new">
-          <Button size="sm">+ New Brief</Button>
+          <Button size="sm">สร้างบรีฟใหม่</Button>
         </Link>
       </div>
 
@@ -182,40 +184,54 @@ function BriefsInner() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="max-md:min-h-11 max-md:min-w-11"
+                    aria-label={`เปิดบรีฟ ${item.id}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       router.push(`/briefs/${item.id}`);
                     }}
                   >
-                    <ArrowRight className="h-4 w-4" />
+                    <MaterialIcon
+                      name="arrow_forward"
+                      size={20}
+                      className="text-foreground"
+                    />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="max-md:min-h-11 max-md:min-w-11"
+                    aria-label={`คัดลอกบรีฟ ${item.id}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       duplicate(item.id);
                     }}
                   >
-                    <Copy className="h-4 w-4" />
+                    <MaterialIcon name="content_copy" size={20} />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="max-md:min-h-11 max-md:min-w-11"
+                    aria-label={`ลบ ${item.id}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!confirm(`ลบ ${item.id}?`)) return;
                       deleteItem(item.id);
                       toast.success(`ลบ ${item.id}`, {
                         action: {
-                          label: "Undo",
+                          label: "เลิกทำ",
                           onClick: () =>
                             useContentStore.getState().undoDelete(),
                         },
                       });
                     }}
                   >
-                    <Trash2 className="h-4 w-4 text-destructive" />
+                    <MaterialIcon
+                      name="delete"
+                      size={20}
+                      className="text-destructive"
+                    />
                   </Button>
                 </div>
               </div>
@@ -224,12 +240,18 @@ function BriefsInner() {
       </div>
 
       {!filtered.length && (
-        <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-          เริ่มวางแผนคอนเทนต์ของคุณ —{" "}
-          <Link href="/briefs/new" className="font-medium text-primary underline">
-            + New Brief
+        <EmptyState
+          icon="note_add"
+          title="ยังไม่มีบรีฟในตัวกรองนี้"
+          description="สร้างบรีฟใหม่หรือปรับตัวกรองด้านบนเพื่อดูรายการอื่น"
+        >
+          <Link
+            href="/briefs/new"
+            className={cn(buttonVariants({ size: "sm" }), "no-underline")}
+          >
+            สร้างบรีฟใหม่
           </Link>
-        </div>
+        </EmptyState>
       )}
     </div>
   );
@@ -237,7 +259,7 @@ function BriefsInner() {
 
 export function BriefsPageClient() {
   return (
-    <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading…</div>}>
+    <Suspense fallback={<PageSpinner label="กำลังโหลดรายการบรีฟ…" />}>
       <BriefsInner />
     </Suspense>
   );

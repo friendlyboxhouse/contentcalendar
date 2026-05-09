@@ -21,7 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { WeeklyReport } from "@/components/export/WeeklyReport";
 import { MonthlyReport } from "@/components/export/MonthlyReport";
 import { cn } from "@/lib/utils";
-import { CalendarDays, FileDown, Eye, Link2, BarChart3 } from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
 
 type ReportKind = "weekly" | "monthly";
 
@@ -108,19 +108,19 @@ export function ExportModal({
           "flex-col md:flex-row"
         )}
       >
-        <DialogTitle className="sr-only">Export Report</DialogTitle>
+        <DialogTitle className="sr-only">ส่งออกรายงาน</DialogTitle>
 
         <aside className="no-print flex w-full shrink-0 flex-col border-b border-gray-200 bg-gray-50 md:h-full md:w-[280px] md:border-r md:border-b-0">
           <div className="border-b border-gray-200 p-4">
             <h2 className="text-[18px] font-semibold text-gray-900">
-              Export Report
+              ส่งออกรายงาน
             </h2>
           </div>
 
           <div className="flex-1 space-y-6 overflow-y-auto p-4">
             <section>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                Report type
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                ประเภทรายงาน
               </p>
               <div className="space-y-2">
                 <button
@@ -134,11 +134,11 @@ export function ExportModal({
                   )}
                 >
                   <span className="flex items-center gap-2 text-[14px] font-semibold text-gray-900">
-                    <CalendarDays className="h-4 w-4" />
-                    Weekly Action Plan
+                    <MaterialIcon name="calendar_month" size={18} />
+                    แผนรายสัปดาห์
                   </span>
                   <span className="mt-1 text-[12px] text-gray-500">
-                    7-day schedule + pipeline
+                    ตาราง 7 วัน + pipeline
                   </span>
                 </button>
                 <button
@@ -152,19 +152,19 @@ export function ExportModal({
                   )}
                 >
                   <span className="flex items-center gap-2 text-[14px] font-semibold text-gray-900">
-                    <BarChart3 className="h-4 w-4" />
-                    Monthly Executive Report
+                    <MaterialIcon name="bar_chart" size={18} />
+                    รายงานผู้บริหารรายเดือน
                   </span>
                   <span className="mt-1 text-[12px] text-gray-500">
-                    Full analysis + performance
+                    สรุปเชิงลึก + ผลงาน
                   </span>
                 </button>
               </div>
             </section>
 
             <section>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                {kind === "weekly" ? "Select week" : "Select month"}
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                {kind === "weekly" ? "เลือกสัปดาห์" : "เลือกเดือน"}
               </p>
               {kind === "weekly" ? (
                 <select
@@ -197,44 +197,44 @@ export function ExportModal({
             </section>
 
             <section className="space-y-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                Options
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                ตัวเลือก
               </p>
-              <label className="flex cursor-pointer items-center gap-2 text-[13px] text-gray-700">
+              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-[13px] text-gray-700">
                 <Checkbox
                   checked={includePerformance}
                   onCheckedChange={(v) =>
                     setIncludePerformance(v === true)
                   }
                 />
-                Include performance data
+                รวมข้อมูลผลงาน
               </label>
-              <label className="flex cursor-pointer items-center gap-2 text-[13px] text-gray-700">
+              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-[13px] text-gray-700">
                 <Checkbox
                   checked={includeDeadlineAlerts}
                   onCheckedChange={(v) =>
                     setIncludeDeadlineAlerts(v === true)
                   }
                 />
-                Include deadline alerts
+                รวมการแจ้งเตือนเดดไลน์
               </label>
-              <label className="flex cursor-pointer items-center gap-2 text-[13px] text-gray-700">
+              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-[13px] text-gray-700">
                 <Checkbox
                   checked={includeRecommendations}
                   onCheckedChange={(v) =>
                     setIncludeRecommendations(v === true)
                   }
                 />
-                Include recommendations
+                รวมข้อเสนอแนะ
               </label>
-              <label className="flex cursor-pointer items-center gap-2 text-[13px] text-gray-700">
+              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-[13px] text-gray-700">
                 <Checkbox
                   checked={showTeamWorkload}
                   onCheckedChange={(v) =>
                     setShowTeamWorkload(v === true)
                   }
                 />
-                Show team workload
+                แสดงภาระงานทีม
               </label>
             </section>
           </div>
@@ -245,8 +245,8 @@ export function ExportModal({
               className="w-full gap-2"
               onClick={handleExportPdf}
             >
-              <FileDown className="h-4 w-4" />
-              Export as PDF
+              <MaterialIcon name="picture_as_pdf" size={18} />
+              ส่งออกเป็น PDF
             </Button>
             <Button
               type="button"
@@ -254,8 +254,8 @@ export function ExportModal({
               className="w-full gap-2 border-gray-300"
               onClick={scrollPreview}
             >
-              <Eye className="h-4 w-4" />
-              Preview
+              <MaterialIcon name="visibility" size={18} />
+              ดูตัวอย่าง
             </Button>
             <Button
               type="button"
@@ -263,11 +263,11 @@ export function ExportModal({
               className="w-full gap-2 text-gray-500"
               disabled
             >
-              <Link2 className="h-4 w-4" />
-              Copy share link
+              <MaterialIcon name="link" size={18} />
+              คัดลอกลิงก์แชร์
             </Button>
-            <p className="text-center text-[10px] text-gray-400">
-              PDF exports best in Chrome or Edge
+            <p className="text-center text-xs text-gray-400">
+              PDF ออกแบบให้พิมพ์ได้ดีใน Chrome หรือ Edge
             </p>
           </div>
         </aside>
@@ -305,8 +305,8 @@ export function ExportModal({
                 )}
               </div>
             </div>
-            <p className="mt-4 text-center text-[11px] text-gray-400">
-              Preview at 75% — exported PDF will be full size
+            <p className="mt-4 text-center text-xs text-gray-400">
+              ตัวอย่างแสดง 75% — ไฟล์ PDF เต็มขนาดจริง
             </p>
           </div>
         </div>

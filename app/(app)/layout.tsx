@@ -1,8 +1,20 @@
-import { SideNav } from "@/components/shared/SideNav";
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { createServerClient } from "@supabase/ssr";
 import { ClientAuthGate } from "@/components/auth/ClientAuthGate";
-import { LocalModeBanner } from "@/components/auth/LocalModeBanner";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { AppShellFrame } from "@/components/shell/AppShellFrame";
+import {
+  getSupabaseAnonKey,
+  getSupabaseUrl,
+  isSupabaseConfigured,
+} from "@/lib/supabase/config";
+import {
+  evaluateEmailAllowlist,
+  allowlistDenialToQueryParam,
+} from "@/lib/supabase/emailAllowlist";
 import { isLikelyProductionHost } from "@/lib/hostKind";
+
+export const dynamic = "force-dynamic";
 
 export default async function AppShellLayout({
   children,
@@ -13,17 +25,60 @@ export default async function AppShellLayout({
   const cloudConfigured = isSupabaseConfigured();
   const blockOpenPlannerWithoutCloud = prodLike && !cloudConfigured;
 
+  if (blockOpenPlannerWithoutCloud) {
+    return (
+      <ClientAuthGate blockOpenPlannerWithoutCloud={blockOpenPlannerWithoutCloud}>
+        <AppShellFrame>{children}</AppShellFrame>
+      </ClientAuthGate>
+    );
+  }
+
+  const h = await headers();
+  const nextFromMiddleware =
+    h.get("x-invoke-path")?.trim() || "/";
+
+  /** โลคัลโดยไม่มี env — middleware ควรพาไป login แล้ว แต่กันบางโฮสต์ที่ไม่รัน middleware */
+  if (!cloudConfigured) {
+    redirect(`/login?next=${encodeURIComponent(nextFromMiddleware)}`);
+  }
+
+  const cookieStore = await cookies();
+  const url = getSupabaseUrl()!;
+  const key = getSupabaseAnonKey()!;
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          );
+        } catch {
+          /* Server Component / layout — อาจ set cookie ไม่ได้ในบางบริบท */
+        }
+      },
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect(`/login?next=${encodeURIComponent(nextFromMiddleware)}`);
+  }
+
+  const allow = await evaluateEmailAllowlist(supabase, user);
+  if (!allow.ok) {
+    const reason = allowlistDenialToQueryParam(allow.error);
+    redirect(`/access-blocked?reason=${encodeURIComponent(reason)}`);
+  }
+
   return (
-    <ClientAuthGate blockOpenPlannerWithoutCloud={blockOpenPlannerWithoutCloud}>
-      <>
-        <SideNav />
-        <main className="min-h-screen bg-muted/30 pl-[240px] transition-[padding] max-xl:pl-[72px] max-md:pb-16 max-md:pl-0">
-          <div className="mx-auto max-w-6xl p-4 md:p-6">
-            <LocalModeBanner />
-            {children}
-          </div>
-        </main>
-      </>
+    <ClientAuthGate blockOpenPlannerWithoutCloud={false}>
+      <AppShellFrame>{children}</AppShellFrame>
     </ClientAuthGate>
   );
 }

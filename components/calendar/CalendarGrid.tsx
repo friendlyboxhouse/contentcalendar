@@ -22,7 +22,8 @@ import { th } from "date-fns/locale";
 import type { ContentItem } from "@/lib/types";
 import { CalendarDayCell } from "@/components/calendar/CalendarDayCell";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
+import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import Link from "next/link";
 import { calculateDeadlines, resolveSLAKey } from "@/lib/utils";
 import { useContentStore } from "@/store/contentStore";
@@ -83,7 +84,7 @@ export function CalendarGrid({
             onClick={() => onMonthChange(subMonths(month, 1))}
             aria-label="เดือนก่อน"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <MaterialIcon name="chevron_left" size={20} />
           </Button>
           <Button
             type="button"
@@ -92,15 +93,16 @@ export function CalendarGrid({
             onClick={() => onMonthChange(addMonths(month, 1))}
             aria-label="เดือนถัดไป"
           >
-            <ChevronRight className="h-4 w-4" />
+            <MaterialIcon name="chevron_right" size={20} />
           </Button>
           <span className="text-base font-semibold capitalize">
             {format(month, "MMMM yyyy", { locale: th })}
           </span>
         </div>
         <Link href="/briefs/new">
-          <Button size="sm" type="button">
-            + New Brief
+          <Button size="sm" type="button" className="gap-1">
+            <MaterialIcon name="post_add" size={18} />
+            สร้างบรีฟใหม่
           </Button>
         </Link>
       </div>
@@ -114,21 +116,39 @@ export function CalendarGrid({
             {w}
           </div>
         ))}
-        {days.map((day) => {
-          const dayItems = items.filter((item) =>
-            isSameDay(new Date(item.publishDate), day)
-          );
-          return (
-            <CalendarDayCell
-              key={format(day, "yyyy-MM-dd")}
-              day={day}
-              currentMonth={month}
-              items={dayItems}
-              onOpenChip={onOpenChip}
-              draggable={draggable}
-            />
-          );
-        })}
+        {items.length === 0 ? (
+          <div className="col-span-7 border-r border-b bg-background">
+            <EmptyState
+              compact
+              icon="event_busy"
+              title="ไม่มีโพสต์ในเดือนนี้"
+              description="ลองเปลี่ยนเดือน ปรับตัวกรอง หรือสร้างบรีฟใหม่"
+              className="rounded-none border-0 bg-transparent py-10 shadow-none"
+            >
+              <Link href="/briefs/new">
+                <Button size="sm" type="button">
+                  สร้างบรีฟใหม่
+                </Button>
+              </Link>
+            </EmptyState>
+          </div>
+        ) : (
+          days.map((day) => {
+            const dayItems = items.filter((item) =>
+              isSameDay(new Date(item.publishDate), day)
+            );
+            return (
+              <CalendarDayCell
+                key={format(day, "yyyy-MM-dd")}
+                day={day}
+                currentMonth={month}
+                items={dayItems}
+                onOpenChip={onOpenChip}
+                draggable={draggable}
+              />
+            );
+          })
+        )}
       </div>
     </>
   );

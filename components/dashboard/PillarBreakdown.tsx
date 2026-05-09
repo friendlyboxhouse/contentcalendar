@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import type { ContentItem } from "@/lib/types";
 import { PILLAR_CONFIG } from "@/lib/constants";
+import { EmptyState } from "@/components/ui/feedback/EmptyState";
 
 export function PillarBreakdown({ items }: { items: ContentItem[] }) {
   const counts = items.reduce(
@@ -29,9 +30,13 @@ export function PillarBreakdown({ items }: { items: ContentItem[] }) {
 
   if (!items.length) {
     return (
-      <div className="flex h-[280px] items-center justify-center rounded-xl border bg-card text-sm text-muted-foreground">
-        ยังไม่มีข้อมูล
-      </div>
+      <EmptyState
+        compact
+        icon="pie_chart"
+        title="ยังไม่มีข้อมูลหมวดคอนเทนต์"
+        description="เมื่อมีบรีฟในระบบ กราฟจะแสดงสัดส่วนตาม Pillar"
+        className="h-[280px] border-solid bg-card shadow-sm"
+      />
     );
   }
 

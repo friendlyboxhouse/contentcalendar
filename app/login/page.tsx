@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { LoginContent } from "./LoginContent";
 import { resolveAuthRedirectOrigin } from "@/lib/authRedirectOrigin";
+import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 
 export default async function LoginPage() {
   const authRedirectOrigin = await resolveAuthRedirectOrigin();
@@ -8,8 +9,8 @@ export default async function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-muted/40 p-6 text-sm text-muted-foreground">
-          กำลังโหลด…
+        <div className="min-h-screen bg-muted/40 py-16">
+          <PageSpinner label="กำลังโหลดหน้าเข้าสู่ระบบ…" />
         </div>
       }
     >
