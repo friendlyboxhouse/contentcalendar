@@ -39,7 +39,11 @@ export default async function AppShellLayout({
 
   /** โลคัลโดยไม่มี env — middleware ควรพาไป login แล้ว แต่กันบางโฮสต์ที่ไม่รัน middleware */
   if (!cloudConfigured) {
-    redirect(`/login?next=${encodeURIComponent(nextFromMiddleware)}`);
+    const qs =
+      nextFromMiddleware !== "/"
+        ? `?next=${encodeURIComponent(nextFromMiddleware)}`
+        : "";
+    redirect(`/login${qs}`);
   }
 
   const cookieStore = await cookies();
@@ -67,7 +71,11 @@ export default async function AppShellLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(`/login?next=${encodeURIComponent(nextFromMiddleware)}`);
+    const qs =
+      nextFromMiddleware !== "/"
+        ? `?next=${encodeURIComponent(nextFromMiddleware)}`
+        : "";
+    redirect(`/login${qs}`);
   }
 
   const allow = await evaluateEmailAllowlist(supabase, user);

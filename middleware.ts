@@ -15,6 +15,35 @@ function supabaseConfigured(): boolean {
   return isSupabaseConfigured();
 }
 
+/** หน้าแรกล้วนๆ (`/`) → `/login` ไม่ติด `next` (หลัง OAuth ใช้ค่าเริ่มต้น `/` จาก LoginContent) */
+function isBareHome(pathname: string, search: string): boolean {
+  return pathname === "/" && !search;
+}
+
+function redirectAnonymousToLogin(
+  request: NextRequest,
+  pathname: string,
+  search: string,
+  nextParam: string,
+  withNoStore: (res: NextResponse) => NextResponse,
+): NextResponse {
+  const bare = isBareHome(pathname, search);
+  const loginUrl = buildSafeRedirectUrl(request, "/login");
+  if (loginUrl) {
+    if (!bare) {
+      loginUrl.searchParams.set("next", nextParam || "/");
+    }
+    return withNoStore(NextResponse.redirect(loginUrl));
+  }
+  const nu = request.nextUrl.clone();
+  nu.pathname = "/login";
+  nu.search = "";
+  if (!bare) {
+    nu.searchParams.set("next", nextParam || "/");
+  }
+  return withNoStore(NextResponse.redirect(nu));
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const nextParam = `${pathname}${request.nextUrl.search}`;
@@ -33,22 +62,30 @@ export async function middleware(request: NextRequest) {
    */
   if (!supabaseConfigured()) {
     if (!isAuthRoute) {
-      const loginUrl = buildSafeRedirectUrl(request, "/login");
-      if (loginUrl) {
-        loginUrl.searchParams.set("next", nextParam || "/");
-        return withNoStore(NextResponse.redirect(loginUrl));
-      }
-      const nu = request.nextUrl.clone();
-      nu.pathname = "/login";
-      nu.searchParams.set("next", nextParam || "/");
-      return withNoStore(NextResponse.redirect(nu));
+      return redirectAnonymousToLogin(
+        request,
+        pathname,
+        request.nextUrl.search,
+        nextParam,
+        withNoStore,
+      );
     }
     return withNoStore(NextResponse.next());
   }
 
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();
+  /** ป้องกันกรณี env ไม่สมบูรณ์ระหว่างรัน — ห้ามเปิดแอปหลักโดยไม่ผ่าน login */
   if (!url || !key) {
+    if (!isAuthRoute) {
+      return redirectAnonymousToLogin(
+        request,
+        pathname,
+        request.nextUrl.search,
+        nextParam,
+        withNoStore,
+      );
+    }
     return withNoStore(NextResponse.next());
   }
 
@@ -123,15 +160,13 @@ export async function middleware(request: NextRequest) {
     }
 
     if (!user && !isAuthRoute) {
-      const loginUrl = buildSafeRedirectUrl(request, "/login");
-      if (loginUrl) {
-        loginUrl.searchParams.set("next", nextParam || "/");
-        return withNoStore(NextResponse.redirect(loginUrl));
-      }
-      const nextUrl = request.nextUrl.clone();
-      nextUrl.pathname = "/login";
-      nextUrl.searchParams.set("next", nextParam || "/");
-      return withNoStore(NextResponse.redirect(nextUrl));
+      return redirectAnonymousToLogin(
+        request,
+        pathname,
+        request.nextUrl.search,
+        nextParam,
+        withNoStore,
+      );
     }
 
     if (user && pathname === "/login") {

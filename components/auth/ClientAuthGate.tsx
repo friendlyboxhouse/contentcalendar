@@ -11,6 +11,12 @@ import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
  * • ไม่มี env / ไม่มี session → ไม่เรนเดอร์แอปโฟลเดอร์ (พาไป /login)
  * • เมลไม่ผ่าน allowlist → middleware พาไป /access-blocked (มี session อยู่)
  */
+function loginRedirectDest(pathname: string, search: string): string {
+  if (pathname === "/" && !search) return "/login";
+  const nextPath = `${pathname}${search}` || "/";
+  return `/login?next=${encodeURIComponent(nextPath)}`;
+}
+
 function AuthWaiting({ label }: { label: string }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40 px-6">
@@ -38,9 +44,7 @@ export function ClientAuthGate({
     if (!configured || !session) {
       const search =
         typeof window !== "undefined" ? window.location.search ?? "" : "";
-      const nextPath = `${pathname}${search}` || "/";
-      const dest = `/login?next=${encodeURIComponent(nextPath)}`;
-      router.replace(dest);
+      router.replace(loginRedirectDest(pathname, search));
     }
   }, [
     blockOpenPlannerWithoutCloud,
@@ -57,8 +61,7 @@ export function ClientAuthGate({
     if (configured && session) return;
     const search =
       typeof window !== "undefined" ? window.location.search ?? "" : "";
-    const nextPath = `${pathname}${search}` || "/";
-    const dest = `/login?next=${encodeURIComponent(nextPath)}`;
+    const dest = loginRedirectDest(pathname, search);
     const t = window.setTimeout(() => {
       if (window.location.pathname !== "/login") {
         window.location.assign(dest);
