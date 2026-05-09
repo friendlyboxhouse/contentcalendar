@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useContentStore } from "@/store/contentStore";
-import type { PlannerFilters, StatCardKey, ContentItem } from "@/lib/types";
+import type { PlannerFilters, StatCardKey } from "@/lib/types";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { ActiveFilterChips } from "@/components/shared/ActiveFilterChips";
 import { KPIReminderBanner } from "@/components/shared/KPIReminderBanner";
@@ -14,6 +14,7 @@ import { CountdownTimer } from "@/components/shared/CountdownTimer";
 import { STATUS_CONFIG } from "@/lib/constants";
 import { filterContentItems } from "@/lib/filterContent";
 import { computeDashboardStats } from "@/lib/dashboardStats";
+import { getNearestDeadline } from "@/lib/nearestDeadline";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { MaterialIcon } from "@/components/ui/material-icon";
@@ -22,19 +23,6 @@ import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
 import { cn } from "@/lib/utils";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
-
-function nearestDeadline(item: ContentItem): { label: string; date: Date } {
-  const candidates: { label: string; date: Date }[] = [
-    { label: "Brief", date: new Date(item.briefDeadline) },
-    { label: "Production", date: new Date(item.productionDeadline) },
-    { label: "Approval", date: new Date(item.approvalDeadline) },
-    { label: "Publish", date: new Date(item.publishDate) },
-  ];
-  const future = candidates.sort(
-    (a, b) => a.date.getTime() - b.date.getTime()
-  );
-  return future[0];
-}
 
 export function DashboardClient() {
   const router = useRouter();
@@ -86,7 +74,10 @@ export function DashboardClient() {
 
   const upcoming = useMemo(() => {
     return [...items]
-      .map((item) => ({ item, ...nearestDeadline(item) }))
+      .map((item) => ({
+        item,
+        ...getNearestDeadline(item, { includeProduction: true }),
+      }))
       .sort((a, b) => a.date.getTime() - b.date.getTime())
       .slice(0, 5);
   }, [items]);

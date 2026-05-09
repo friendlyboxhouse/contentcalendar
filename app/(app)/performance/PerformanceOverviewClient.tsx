@@ -15,6 +15,7 @@ import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
 import { cn } from "@/lib/utils";
 import { PillarTag } from "@/components/shared/PillarTag";
 import { Badge } from "@/components/ui/badge";
+import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 import { summarizeKPIResults } from "@/lib/kpi";
 import {
   calcEngagementRate,
@@ -24,6 +25,7 @@ import { filterContentItems } from "@/lib/filterContent";
 
 export function PerformanceOverviewClient() {
   const hydrated = useContentStoreHydrated();
+  const { workspaceLoading, contentSyncedOnce } = useSupabaseApp();
   const items = useContentStore((s) => s.items);
   const [filters, setFilters] = useState<PlannerFilters>({
     pillar: "all",
@@ -122,10 +124,10 @@ export function PerformanceOverviewClient() {
     return Math.round((passedK / totalK) * 100);
   }, [reviewed]);
 
-  if (!hydrated) {
+  if (!hydrated || workspaceLoading || !contentSyncedOnce) {
     return (
       <div className="min-h-[min(60vh,420px)] py-8">
-        <PageSpinner label="กำลังโหลดผลงาน…" />
+        <PageSpinner label="กำลังซิงค์ผลงาน…" />
       </div>
     );
   }

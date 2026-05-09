@@ -30,6 +30,9 @@ import {
 import { toast } from "sonner";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
+import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
+import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
+import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 
 function emptyMetrics(): MetricsSnapshot {
   return {
@@ -49,6 +52,8 @@ export function PerformanceDetailClient({ id }: { id: string }) {
   const items = useContentStore((s) => s.items);
   const updateItem = useContentStore((s) => s.updateItem);
   const { canEdit } = usePlannerPermissions();
+  const hydrated = useContentStoreHydrated();
+  const { workspaceLoading, contentSyncedOnce } = useSupabaseApp();
 
   const base = items.find((i) => i.id === id);
 
@@ -89,6 +94,14 @@ export function PerformanceDetailClient({ id }: { id: string }) {
     () => calcShareRate(finalM.shares, finalM.reach),
     [finalM]
   );
+
+  if (!hydrated || workspaceLoading || !contentSyncedOnce) {
+    return (
+      <div className="min-h-[min(60vh,420px)] py-8">
+        <PageSpinner label="กำลังซิงค์ข้อมูลผลงาน…" />
+      </div>
+    );
+  }
 
   if (!base) {
     return (

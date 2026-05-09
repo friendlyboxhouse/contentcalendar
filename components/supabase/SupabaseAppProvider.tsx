@@ -57,6 +57,8 @@ type Ctx = {
   workspaces: WorkspaceSummary[];
   workspaceMembers: WorkspaceMemberRow[];
   workspaceLoading: boolean;
+  /** true หลังโหลด content_items รอบแรกของ workspace ปัจจุบันเสร็จ (หรือไม่มี cloud sync) */
+  contentSyncedOnce: boolean;
   setActiveWorkspace: (workspaceId: string) => void;
   refreshWorkspace: () => Promise<void>;
   /** เข้าเมนูหลังบ้านได้จากตาราง admin_emails (ไม่ใช้ profiles.role) */
@@ -83,6 +85,7 @@ const SupabaseAppContext = createContext<Ctx>({
   workspaces: [],
   workspaceMembers: [],
   workspaceLoading: false,
+  contentSyncedOnce: true,
   setActiveWorkspace: () => {},
   refreshWorkspace: async () => {},
   canAccessAdmin: false,
@@ -133,6 +136,7 @@ export function SupabaseAppProvider({
     []
   );
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [contentSyncedOnce, setContentSyncedOnce] = useState(!configured);
 
   useEffect(() => {
     if (!supabase) {
@@ -209,6 +213,7 @@ export function SupabaseAppProvider({
       setWorkspaces([]);
       setWorkspaceMembers([]);
       setWorkspaceLoading(false);
+      setContentSyncedOnce(true);
       return;
     }
     setWorkspaceLoading(true);
@@ -227,6 +232,7 @@ export function SupabaseAppProvider({
       setWorkspaces([]);
       setWorkspaceMembers([]);
       setWorkspaceLoading(false);
+      setContentSyncedOnce(true);
       return;
     }
 
@@ -249,6 +255,7 @@ export function SupabaseAppProvider({
       setWorkspaces([]);
       setWorkspaceMembers([]);
       setWorkspaceLoading(false);
+      setContentSyncedOnce(true);
       return;
     }
 
@@ -299,6 +306,7 @@ export function SupabaseAppProvider({
     if (!wsId) {
       setWorkspaceMembers([]);
       setWorkspaceLoading(false);
+      setContentSyncedOnce(true);
       return;
     }
 
@@ -311,6 +319,7 @@ export function SupabaseAppProvider({
       if (memErr) toast.error(`โหลดสมาชิกทีมล้มเหลว: ${memErr.message}`);
       setWorkspaceMembers([]);
       setWorkspaceLoading(false);
+      setContentSyncedOnce(true);
       return;
     }
 
@@ -324,6 +333,7 @@ export function SupabaseAppProvider({
       toast.error(`โหลดโปรไฟล์ทีมล้มเหลว: ${pErr.message}`);
       setWorkspaceMembers([]);
       setWorkspaceLoading(false);
+      setContentSyncedOnce(true);
       return;
     }
 
@@ -404,6 +414,11 @@ export function SupabaseAppProvider({
     setWorkspaceId(match.id);
     setWorkspaceRole(match.role);
     setWorkspaceMembers([]);
+    setWorkspaceLoading(true);
+    setContentSyncedOnce(false);
+    runAsRemoteApply(() => {
+      useContentStore.getState().replaceAllItems([]);
+    });
     if (typeof window !== "undefined") {
       window.localStorage.setItem(ACTIVE_WORKSPACE_KEY, match.id);
     }
@@ -420,6 +435,8 @@ export function SupabaseAppProvider({
     setWorkspaceRole(null);
     setWorkspaces([]);
     setWorkspaceMembers([]);
+    setWorkspaceLoading(false);
+    setContentSyncedOnce(true);
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(ACTIVE_WORKSPACE_KEY);
     }
@@ -443,12 +460,14 @@ export function SupabaseAppProvider({
 
     if (!supabase || !configured || !session?.user || !workspaceId) {
       clearSyncHandlers();
+      setContentSyncedOnce(true);
       return;
     }
 
     const userId = session.user.id;
     const wsId = workspaceId;
     let cancelled = false;
+    setContentSyncedOnce(false);
 
     const upsertItem = async (item: ContentItem) => {
       const payload = JSON.parse(JSON.stringify(item)) as Record<string, unknown>;
@@ -494,6 +513,7 @@ export function SupabaseAppProvider({
 
       if (error) {
         toastSupabasePersistError(error);
+        setContentSyncedOnce(true);
         return;
       }
 
@@ -503,6 +523,7 @@ export function SupabaseAppProvider({
       runAsRemoteApply(() => {
         useContentStore.getState().replaceAllItems(revived);
       });
+      setContentSyncedOnce(true);
 
       if (cancelled) return;
 
@@ -561,6 +582,7 @@ export function SupabaseAppProvider({
       workspaces,
       workspaceMembers,
       workspaceLoading,
+      contentSyncedOnce,
       setActiveWorkspace,
       refreshWorkspace,
       canAccessAdmin,
@@ -584,6 +606,7 @@ export function SupabaseAppProvider({
       workspaces,
       workspaceMembers,
       workspaceLoading,
+      contentSyncedOnce,
       setActiveWorkspace,
       refreshWorkspace,
       canAccessAdmin,

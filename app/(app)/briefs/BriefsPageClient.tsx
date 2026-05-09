@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { useContentStore } from "@/store/contentStore";
-import type { ContentItem, ContentStatus, PlannerFilters } from "@/lib/types";
+import type { ContentStatus, PlannerFilters } from "@/lib/types";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { ActiveFilterChips } from "@/components/shared/ActiveFilterChips";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { MaterialIcon } from "@/components/ui/material-icon";
 import { toast } from "sonner";
 import { cn, generatePostId } from "@/lib/utils";
 import { reviveContentItem } from "@/lib/revive";
+import { getNearestDeadline } from "@/lib/nearestDeadline";
 import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import {
@@ -35,21 +36,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
-
-function getNearestDeadline(item: ContentItem): { label: string; date: Date } | null {
-  const now = Date.now();
-  const candidates = [
-    { label: "บรีฟ", date: new Date(item.briefDeadline) },
-    { label: "อนุมัติ", date: new Date(item.approvalDeadline) },
-    { label: "เผยแพร่", date: new Date(item.publishDate) },
-  ].filter((c) => c.date.getTime() > now).sort((a, b) => a.date.getTime() - b.date.getTime());
-  if (candidates.length) return candidates[0];
-  // All past — show publish date anyway
-  return { label: "เผยแพร่", date: new Date(item.publishDate) };
-}
+import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
+import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 
 function BriefsInner() {
   const router = useRouter();
+  const hydrated = useContentStoreHydrated();
+  const { workspaceLoading, contentSyncedOnce } = useSupabaseApp();
   const items = useContentStore((s) => s.items);
   const updateStatus = useContentStore((s) => s.updateStatus);
   const deleteItem = useContentStore((s) => s.deleteItem);
@@ -98,6 +91,14 @@ function BriefsInner() {
         new Date(b.publishDate).getTime()
     );
   }, [items, filters, fsStatuses, search]);
+
+  if (!hydrated || workspaceLoading || !contentSyncedOnce) {
+    return (
+      <div className="min-h-[min(60vh,420px)] py-8">
+        <PageSpinner label="กำลังซิงค์รายการบรีฟ…" />
+      </div>
+    );
+  }
 
   const duplicate = (id: string) => {
     const src = items.find((i) => i.id === id);

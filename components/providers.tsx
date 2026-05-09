@@ -62,7 +62,7 @@ export function Providers({
     >
       <SupabaseAppProvider supabasePublic={supabasePublic}>
         {children}
-        <Toaster richColors position="top-center" />
+        <Toaster richColors position="top-center" theme="system" />
         <CommandPaletteGate />
       </SupabaseAppProvider>
     </ThemeProvider>

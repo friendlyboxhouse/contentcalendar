@@ -156,9 +156,10 @@ export function SideNav() {
         </nav>
 
         {configured && session && workspaces.length > 0 ? (
-          <div className="space-y-1 max-xl:hidden max-md:hidden">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Workspace
+          <div className="space-y-1 max-md:hidden">
+            <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <MaterialIcon name="groups" size={14} className="xl:hidden" />
+              <span className="max-xl:hidden">Workspace</span>
             </p>
             <Select
               value={workspaceId ?? ""}
@@ -166,8 +167,15 @@ export function SideNav() {
                 if (v) setActiveWorkspace(v);
               }}
             >
-              <SelectTrigger className="h-9 w-full bg-sidebar-accent/40">
-                <SelectValue placeholder="เลือก workspace" />
+              <SelectTrigger
+                className="h-9 w-full bg-sidebar-accent/40 max-xl:w-10 max-xl:justify-center max-xl:px-2"
+                title="เลือก workspace"
+              >
+                <MaterialIcon name="groups" size={16} className="xl:hidden" />
+                <SelectValue
+                  className="max-xl:hidden"
+                  placeholder="เลือก workspace"
+                />
               </SelectTrigger>
               <SelectContent>
                 {workspaces.map((w) => (
@@ -264,7 +272,8 @@ export function SideNav() {
               <MaterialIcon name="flag" size={14} />
               สถานะ
             </span>
-            <MaterialIcon name="expand_more" size={18} className="max-xl:hidden opacity-70" />
+            <MaterialIcon name="flag" size={16} className="opacity-70 xl:hidden" />
+            <MaterialIcon name="expand_more" size={18} className="hidden opacity-70 xl:block" />
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-2 space-y-1">
             {CONTENT_STATUSES_ORDERED.map((key) => {

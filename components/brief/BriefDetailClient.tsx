@@ -65,6 +65,7 @@ import {
 import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { useDraftAutosave } from "@/hooks/useDraftAutosave";
+import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
 import {
   Dialog,
   DialogContent,
@@ -115,9 +116,11 @@ export function BriefDetailClient({ briefId }: Props) {
     workspaceId,
     workspaceMembers,
     workspaceLoading,
+    contentSyncedOnce,
     session,
   } = useSupabaseApp();
   const { canEdit } = usePlannerPermissions();
+  const hydrated = useContentStoreHydrated();
 
   const isNew = !briefId;
   const seedNewRef = useRef<ContentItem | null>(null);
@@ -148,24 +151,16 @@ export function BriefDetailClient({ briefId }: Props) {
   const [pendingGenericStatus, setPendingGenericStatus] =
     useState<ContentStatus | null>(null);
 
-  // Initialize draft once per briefId — DO NOT depend on `existing` (new ref each render).
-  // This prevents unsaved edits from being wiped when store updates from elsewhere.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isNew && seedNewRef.current) {
-      setDraft(mergeBriefDraft(seedNewRef.current));
+      setDraft((curr) => curr ?? mergeBriefDraft(seedNewRef.current!));
       return;
     }
-    if (!isNew && briefId) {
-      const fromStore = useContentStore
-        .getState()
-        .items.find((i) => i.id === briefId);
-      if (fromStore) {
-        setDraft(mergeBriefDraft({ ...fromStore }));
-      }
+    if (!isNew && existing) {
+      // seed draft when store data arrives later (after workspace sync)
+      setDraft((curr) => curr ?? mergeBriefDraft({ ...existing }));
     }
-    // Only re-init when navigating to a different brief
-  }, [briefId, isNew]);
+  }, [isNew, existing]);
 
   const slaPreset: SLAPresetKey =
     draft?.slaPresetKey ?? resolveSLAKey(draft?.format ?? "static_post");
@@ -303,6 +298,10 @@ export function BriefDetailClient({ briefId }: Props) {
       rows.push({ key: "ugcVolumeTarget", label: "UGC Volume", suffix: "" });
     return rows;
   }, [funnelStage]);
+
+  if (!hydrated || workspaceLoading || !contentSyncedOnce) {
+    return <PageSpinner label="กำลังซิงค์ข้อมูลบรีฟ…" />;
+  }
 
   if (!isNew && !existing) {
     return (
@@ -861,7 +860,7 @@ export function BriefDetailClient({ briefId }: Props) {
           <CardContent className="space-y-2">
             {draft.dos.map((line, i) => (
               <Input
-                key={i}
+                key={`dos-${i}-${line}`}
                 value={line}
                 disabled={!canEdit}
                 onChange={(e) => {
@@ -889,7 +888,7 @@ export function BriefDetailClient({ briefId }: Props) {
           <CardContent className="space-y-2">
             {draft.donts.map((line, i) => (
               <Input
-                key={i}
+                key={`donts-${i}-${line}`}
                 value={line}
                 disabled={!canEdit}
                 onChange={(e) => {

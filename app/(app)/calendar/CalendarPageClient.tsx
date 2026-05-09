@@ -34,9 +34,11 @@ import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
 import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
+import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 
 export function CalendarPageClient() {
   const hydrated = useContentStoreHydrated();
+  const { workspaceLoading, contentSyncedOnce } = useSupabaseApp();
   const items = useContentStore((s) => s.items);
   const updateStatus = useContentStore((s) => s.updateStatus);
   const deleteItem = useContentStore((s) => s.deleteItem);
@@ -88,10 +90,10 @@ export function CalendarPageClient() {
     [filtered]
   );
 
-  if (!hydrated) {
+  if (!hydrated || workspaceLoading || !contentSyncedOnce) {
     return (
       <div className="min-h-[min(60vh,420px)] py-8">
-        <PageSpinner label="กำลังโหลดปฏิทิน…" />
+        <PageSpinner label="กำลังซิงค์ปฏิทิน…" />
       </div>
     );
   }
