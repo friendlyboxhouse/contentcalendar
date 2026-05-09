@@ -14,7 +14,21 @@ import {
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 
-export function LoginContent() {
+/** ใช้ origin จากเซิร์ฟเวอร์ก่อน — ไม่พึ่งแค่ window (กัน redirect ไป 0.0.0.0:3000) */
+function pickOAuthOrigin(serverOrigin: string): string {
+  const s = serverOrigin.trim();
+  if (s && !s.includes("0.0.0.0")) return s;
+  if (typeof window === "undefined") return s;
+  const w = window.location.origin;
+  if (!w.includes("0.0.0.0")) return w || s;
+  return s;
+}
+
+export function LoginContent({
+  authRedirectOrigin,
+}: {
+  authRedirectOrigin: string;
+}) {
   const searchParams = useSearchParams();
   const { configured, supabase } = useSupabaseApp();
   const rawError = searchParams.get("error");
@@ -22,6 +36,12 @@ export function LoginContent() {
   const errorMessage = useMemo(() => {
     if (rawError === "email_not_allowlisted") {
       return "บัญชีอีเมลนี้ไม่อยู่ในรายการที่ได้รับอนุญาต — ติดต่อผู้ดูแลระบบ";
+    }
+    if (rawError === "allowlist_empty") {
+      return "ยังไม่ได้ตั้งค่ารายการอีเมลที่อนุญาต (allowed_emails ว่าง) — ให้ผู้ดูแลเพิ่มอย่างน้อยหนึ่งอีเมลใน Supabase";
+    }
+    if (rawError === "allowlist_check_failed") {
+      return "ตรวจสอบสิทธิ์การเข้าใช้ไม่สำเร็จ — ลองใหม่หรือตรวจการเชื่อมต่อ Supabase";
     }
     if (!rawError || rawError === "missing_code") {
       return rawError === "missing_code"
@@ -40,8 +60,13 @@ export function LoginContent() {
       toast.error("ยังไม่ได้ตั้งค่า Supabase");
       return;
     }
-    const origin =
-      typeof window !== "undefined" ? window.location.origin : "";
+    const origin = pickOAuthOrigin(authRedirectOrigin);
+    if (!origin || origin.includes("0.0.0.0")) {
+      toast.error(
+        "ที่อยู่เว็บไม่เหมาะกับล็อกอิน — ตั้งค่า SITE_URL=https://โดเมนจริง ใน Hostinger แล้วเข้าเว็บผ่านโดเมนนั้น (อย่าเปิดผ่าน 0.0.0.0)"
+      );
+      return;
+    }
     const next = searchParams.get("next") ?? "/";
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",

@@ -1,25 +1,67 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
+import { ProductionCloudRequired } from "@/components/auth/ProductionCloudRequired";
 
 /**
- * สำรองเมื่อ middleware บนโฮสต์ไม่ทำงาน / env ไม่ถูกฝังตอน build —
- * ถ้ามี Supabase ครบแต่ยังไม่มี session จะพาไป /login
+ * • บนโดเมนจริงถ้าเซิร์ฟเวอร์ไม่เห็น Supabase env → บล็อกแอป (กันเข้าได้โดยไม่ล็อกอิน)
+ * • สำรองเมื่อ middleware (Edge) ไม่มี env แต่ client มี session path — พาไป /login ถ้าไม่มี session
  */
-export function ClientAuthGate({ children }: { children: React.ReactNode }) {
+export function ClientAuthGate({
+  children,
+  blockOpenPlannerWithoutCloud = false,
+}: {
+  children: React.ReactNode;
+  /** จากเซิร์ฟเวอร์: โฮสต์จริง + isSupabaseConfigured() = false */
+  blockOpenPlannerWithoutCloud?: boolean;
+}) {
   const { configured, session, authHydrated } = useSupabaseApp();
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (blockOpenPlannerWithoutCloud) return;
     if (!configured || !authHydrated || session) return;
     const search =
       typeof window !== "undefined" ? window.location.search ?? "" : "";
     const nextPath = `${pathname}${search}` || "/";
-    router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
-  }, [configured, authHydrated, session, pathname, router]);
+    const dest = `/login?next=${encodeURIComponent(nextPath)}`;
+    router.replace(dest);
+  }, [
+    blockOpenPlannerWithoutCloud,
+    configured,
+    authHydrated,
+    session,
+    pathname,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (blockOpenPlannerWithoutCloud) return;
+    if (!configured || !authHydrated || session) return;
+    const search =
+      typeof window !== "undefined" ? window.location.search ?? "" : "";
+    const nextPath = `${pathname}${search}` || "/";
+    const dest = `/login?next=${encodeURIComponent(nextPath)}`;
+    const t = window.setTimeout(() => {
+      if (window.location.pathname !== "/login") {
+        window.location.assign(dest);
+      }
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, [
+    blockOpenPlannerWithoutCloud,
+    configured,
+    authHydrated,
+    session,
+    pathname,
+  ]);
+
+  if (blockOpenPlannerWithoutCloud) {
+    return <ProductionCloudRequired />;
+  }
 
   if (!configured) {
     return <>{children}</>;

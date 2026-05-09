@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, FileDown, Plus } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/collapsible";
 import { useContentStore } from "@/store/contentStore";
 import { useEffect, useState } from "react";
+import { ExportModal } from "@/components/export/ExportModal";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 
@@ -25,14 +26,26 @@ const nav = [
   { href: "/calendar", label: "Calendar", symbol: "calendar_month" },
   { href: "/briefs", label: "Content Briefs", symbol: "assignment" },
   { href: "/performance", label: "Performance", symbol: "analytics" },
+  { href: "/settings", label: "ตั้งค่า", symbol: "settings" },
 ];
 
 export function SideNav() {
   const pathname = usePathname();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const items = useContentStore((s) => s.items);
   const seedFromDemo = useContentStore((s) => s.seedFromDemo);
-  const { configured, session, signOut, role } = useSupabaseApp();
+  const {
+    configured,
+    session,
+    signOut,
+    canAccessAdmin,
+    displayName,
+    organizationName,
+    organizationTagline,
+    reportFooterNote,
+  } = useSupabaseApp();
 
   useEffect(() => setMounted(true), []);
 
@@ -61,19 +74,24 @@ export function SideNav() {
           <MaterialIcon name="event_available" size={32} className="text-primary" />
           <div>
             <div className="text-sm font-semibold leading-tight">Content Planner</div>
-            <div className="text-[10px] text-muted-foreground">DINKR</div>
+            <div
+              className="max-w-[180px] truncate text-[10px] text-muted-foreground"
+              title={organizationTagline || organizationName}
+            >
+              {organizationTagline || organizationName}
+            </div>
           </div>
         </div>
 
         <nav className="flex flex-col gap-1 max-xl:w-full max-md:flex-row max-md:justify-center">
           {[
             ...nav,
-            ...(configured && session && role === "admin"
+            ...(configured && session && canAccessAdmin
               ? ([
                   {
-                    href: "/admin/access",
-                    label: "การเข้าถึง",
-                    symbol: "manage_accounts",
+                    href: "/admin",
+                    label: "หลังบ้าน",
+                    symbol: "admin_panel_settings",
                   },
                 ] as const)
               : []),
@@ -100,6 +118,25 @@ export function SideNav() {
             );
           })}
         </nav>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="no-print w-full justify-start gap-2 border-gray-200 text-[13px] font-medium hover:bg-gray-100 max-xl:px-2 max-md:hidden"
+          onClick={() => setExportOpen(true)}
+        >
+          <FileDown className="h-4 w-4 shrink-0" />
+          <span className="max-xl:hidden">Export Report</span>
+        </Button>
+
+        <ExportModal
+          open={exportOpen}
+          onClose={() => setExportOpen(false)}
+          items={items}
+          brandName={organizationName}
+          reportFooterNote={reportFooterNote}
+        />
 
         <Link
           href="/briefs/new"
@@ -174,8 +211,13 @@ export function SideNav() {
                 <MaterialIcon name="person" size={18} className="mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">
-                    {session.user.email ?? session.user.id.slice(0, 8)}
+                    {displayName ?? session.user.email ?? session.user.id.slice(0, 8)}
                   </div>
+                  {displayName && session.user.email && (
+                    <div className="truncate text-[10px] text-muted-foreground">
+                      {session.user.email}
+                    </div>
+                  )}
                   <div className="text-[10px] text-muted-foreground">ซิงค์คลาวด์เปิดอยู่</div>
                 </div>
               </div>

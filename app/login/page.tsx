@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import { LoginContent } from "./LoginContent";
+import { resolveAuthRedirectOrigin } from "@/lib/authRedirectOrigin";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const authRedirectOrigin = await resolveAuthRedirectOrigin();
+
   return (
     <Suspense
       fallback={
@@ -10,7 +13,7 @@ export default function LoginPage() {
         </div>
       }
     >
-      <LoginContent />
+      <LoginContent authRedirectOrigin={authRedirectOrigin} />
     </Suspense>
   );
 }

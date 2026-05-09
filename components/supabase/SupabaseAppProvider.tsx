@@ -31,9 +31,17 @@ type Ctx = {
   authHydrated: boolean;
   session: Session | null;
   role: PlannerRole;
+  /** เข้าเมนูหลังบ้านได้จากตาราง admin_emails (ไม่ใช้ profiles.role) */
+  canAccessAdmin: boolean;
+  /** ชื่อที่ใช้ในแอป (จาก profiles.display_name) */
+  displayName: string | null;
+  organizationName: string;
+  organizationTagline: string;
+  reportFooterNote: string;
   loadingProfile: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  refreshOrganizationSettings: () => Promise<void>;
 };
 
 const SupabaseAppContext = createContext<Ctx>({
@@ -42,9 +50,15 @@ const SupabaseAppContext = createContext<Ctx>({
   authHydrated: false,
   session: null,
   role: "editor",
+  canAccessAdmin: false,
+  displayName: null,
+  organizationName: "DINKR",
+  organizationTagline: "",
+  reportFooterNote: "",
   loadingProfile: false,
   signOut: async () => {},
   refreshProfile: async () => {},
+  refreshOrganizationSettings: async () => {},
 });
 
 export function useSupabaseApp() {
@@ -70,7 +84,12 @@ export function SupabaseAppProvider({
   const [session, setSession] = useState<Session | null>(null);
   const [authHydrated, setAuthHydrated] = useState(false);
   const [role, setRole] = useState<PlannerRole>("editor");
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [organizationName, setOrganizationName] = useState("DINKR");
+  const [organizationTagline, setOrganizationTagline] = useState("");
+  const [reportFooterNote, setReportFooterNote] = useState("");
   const [loadingProfile, setLoadingProfile] = useState(false);
+  const [canAccessAdmin, setCanAccessAdmin] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -104,28 +123,78 @@ export function SupabaseAppProvider({
     if (!supabase) return;
     if (!session?.user) {
       setRole("editor");
+      setCanAccessAdmin(false);
+      setDisplayName(null);
       setLoadingProfile(false);
       return;
     }
     setLoadingProfile(true);
     const { data, error } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, display_name")
       .eq("id", session.user.id)
       .maybeSingle();
     if (error) {
       console.warn(error.message);
       setRole("editor");
+      setDisplayName(null);
+      setCanAccessAdmin(false);
     } else {
       const r = data?.role as PlannerRole | undefined;
       setRole(r === "viewer" || r === "admin" ? r : "editor");
+      const dn = data?.display_name;
+      setDisplayName(
+        typeof dn === "string" && dn.trim() ? dn.trim() : null
+      );
+      const { data: portalAdmin, error: adminErr } = await supabase.rpc(
+        "is_admin_email"
+      );
+      if (adminErr) {
+        console.warn("is_admin_email:", adminErr.message);
+        setCanAccessAdmin(false);
+      } else {
+        setCanAccessAdmin(!!portalAdmin);
+      }
     }
     setLoadingProfile(false);
+  }, [supabase, session?.user]);
+
+  const refreshOrganizationSettings = useCallback(async () => {
+    if (!supabase || !session?.user) {
+      setOrganizationName("DINKR");
+      setOrganizationTagline("");
+      setReportFooterNote("");
+      return;
+    }
+    const { data, error } = await supabase
+      .from("app_settings")
+      .select("organization_name, organization_tagline, report_footer_note")
+      .eq("id", "global")
+      .maybeSingle();
+    if (error) {
+      console.warn("app_settings:", error.message);
+      setOrganizationName("DINKR");
+      setOrganizationTagline("");
+      setReportFooterNote("");
+      return;
+    }
+    const row = data as {
+      organization_name?: string;
+      organization_tagline?: string;
+      report_footer_note?: string;
+    } | null;
+    setOrganizationName(row?.organization_name?.trim() || "DINKR");
+    setOrganizationTagline(row?.organization_tagline?.trim() ?? "");
+    setReportFooterNote(row?.report_footer_note?.trim() ?? "");
   }, [supabase, session?.user]);
 
   useEffect(() => {
     void refreshProfile();
   }, [refreshProfile]);
+
+  useEffect(() => {
+    void refreshOrganizationSettings();
+  }, [refreshOrganizationSettings]);
 
   const signOut = useCallback(async () => {
     if (!supabase) return;
@@ -253,9 +322,15 @@ export function SupabaseAppProvider({
       authHydrated,
       session,
       role,
+      canAccessAdmin,
+      displayName,
+      organizationName,
+      organizationTagline,
+      reportFooterNote,
       loadingProfile,
       signOut,
       refreshProfile,
+      refreshOrganizationSettings,
     }),
     [
       configured,
@@ -263,9 +338,15 @@ export function SupabaseAppProvider({
       authHydrated,
       session,
       role,
+      canAccessAdmin,
+      displayName,
+      organizationName,
+      organizationTagline,
+      reportFooterNote,
       loadingProfile,
       signOut,
       refreshProfile,
+      refreshOrganizationSettings,
     ]
   );
 
