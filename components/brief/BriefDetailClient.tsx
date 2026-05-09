@@ -15,6 +15,8 @@ import type {
   ContentStatus,
   RevisionRound,
   SLAPresetKey,
+  ApprovalTrackRow,
+  RevisionHistoryEntry,
 } from "@/lib/types";
 import {
   PILLAR_CONFIG,
@@ -44,6 +46,36 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { MaterialIcon } from "@/components/ui/material-icon";
+import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
+
+const APPROVAL_ROLE_LABELS: Record<ApprovalTrackRow["role"], string> = {
+  creative_lead: "Creative Lead",
+  brand_manager: "Brand Manager",
+  final: "Final approval",
+};
+
+const DEFAULT_APPROVAL_ROWS: ApprovalTrackRow[] = [
+  { role: "creative_lead", name: "", approved: false },
+  { role: "brand_manager", name: "", approved: false },
+  { role: "final", name: "", approved: false },
+];
+
+function mergeApprovalTrack(rows?: ApprovalTrackRow[]): ApprovalTrackRow[] {
+  return DEFAULT_APPROVAL_ROWS.map((base, i) => ({
+    ...base,
+    ...(rows?.[i] ?? {}),
+    role: base.role,
+  }));
+}
+
+function mergeBriefDraft(item: ContentItem): ContentItem {
+  return {
+    ...item,
+    approvalTrack: mergeApprovalTrack(item.approvalTrack),
+    revisionHistory: item.revisionHistory ?? [],
+  };
+}
 
 type Props = { briefId?: string };
 
@@ -53,6 +85,8 @@ export function BriefDetailClient({ briefId }: Props) {
   const addItem = useContentStore((s) => s.addItem);
   const updateItem = useContentStore((s) => s.updateItem);
   const updateStatus = useContentStore((s) => s.updateStatus);
+  const { role } = useSupabaseApp();
+  const canEdit = role !== "viewer";
 
   const isNew = !briefId;
   const seedNewRef = useRef<ContentItem | null>(null);
@@ -65,14 +99,16 @@ export function BriefDetailClient({ briefId }: Props) {
     : undefined;
 
   const [draft, setDraft] = useState<ContentItem | null>(null);
+  const [revNote, setRevNote] = useState("");
+  const [revRound, setRevRound] = useState<RevisionRound>("R1");
 
   useEffect(() => {
     if (isNew && seedNewRef.current) {
-      setDraft(seedNewRef.current);
+      setDraft(mergeBriefDraft(seedNewRef.current));
       return;
     }
     if (!isNew && existing) {
-      setDraft({ ...existing });
+      setDraft(mergeBriefDraft({ ...existing }));
     }
   }, [isNew, existing, briefId]);
 
@@ -146,6 +182,7 @@ export function BriefDetailClient({ briefId }: Props) {
     setDraft((d) => (d ? { ...d, [key]: val } : d));
 
   const applyStatus = (next: ContentStatus) => {
+    if (!canEdit) return;
     if (next === "published") {
       if (
         !confirm(
@@ -190,6 +227,10 @@ export function BriefDetailClient({ briefId }: Props) {
   };
 
   const save = () => {
+    if (!canEdit) {
+      toast.message("บัญชีของคุณเป็นโหมดดูอย่างเดียว");
+      return;
+    }
     const err = validate();
     if (err) {
       toast.error(err);
@@ -213,8 +254,43 @@ export function BriefDetailClient({ briefId }: Props) {
 
   const dateStr = (d: Date) => format(new Date(d), "yyyy-MM-dd");
 
+  const addRevisionEntry = () => {
+    if (!canEdit) return;
+    const note = revNote.trim();
+    if (!note) {
+      toast.error("กรอกบันทึก revision");
+      return;
+    }
+    const entry: RevisionHistoryEntry = {
+      round: revRound,
+      date: new Date(),
+      note,
+    };
+    setField("revisionHistory", [...(draft.revisionHistory ?? []), entry]);
+    setRevNote("");
+    toast.success("บันทึก revision แล้ว");
+  };
+
+  const setApprovalRow = (index: number, patch: Partial<ApprovalTrackRow>) => {
+    const track = mergeApprovalTrack(draft.approvalTrack);
+    track[index] = { ...track[index], ...patch };
+    if (patch.approved === true && !track[index].approvedAt) {
+      track[index].approvedAt = new Date();
+    }
+    if (patch.approved === false) {
+      track[index].approvedAt = undefined;
+    }
+    setField("approvalTrack", track);
+  };
+
   return (
     <div className="space-y-6 pb-28">
+      {!canEdit && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
+          <MaterialIcon name="visibility" size={20} />
+          โหมดดูอย่างเดียว — การแก้ไขและบันทึกถูกปิดสำหรับบทบาท viewer
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <Link
@@ -223,7 +299,10 @@ export function BriefDetailClient({ briefId }: Props) {
           >
             ← Back
           </Link>
-          <h1 className="text-xl font-bold">{draft.id}</h1>
+          <h1 className="flex items-center gap-2 text-xl font-bold">
+            <MaterialIcon name="description" size={24} />
+            {draft.id}
+          </h1>
           <PillarTag pillar={draft.pillar} size="sm" />
         </div>
         <div className="flex gap-2">
@@ -231,13 +310,15 @@ export function BriefDetailClient({ briefId }: Props) {
             <Link
               href={`/performance/${draft.id}`}
               className={cn(
-                buttonVariants({ variant: "outline", size: "sm" })
+                buttonVariants({ variant: "outline", size: "sm", className: "gap-1" })
               )}
             >
+              <MaterialIcon name="bar_chart" size={18} />
               Performance
             </Link>
           )}
-          <Button size="sm" onClick={save}>
+          <Button size="sm" onClick={save} disabled={!canEdit} className="gap-1">
+            <MaterialIcon name="save" size={18} />
             Save Brief
           </Button>
         </div>
@@ -245,7 +326,10 @@ export function BriefDetailClient({ briefId }: Props) {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Status pipeline</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <MaterialIcon name="timeline" size={18} />
+            Status pipeline
+          </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <div className="flex min-w-max gap-1 pb-1">
@@ -253,8 +337,9 @@ export function BriefDetailClient({ briefId }: Props) {
               <div key={st} className="flex items-center gap-1">
                 <button
                   type="button"
+                  disabled={!canEdit}
                   className={cn(
-                    "rounded-full px-2 py-1 text-xs transition",
+                    "rounded-full px-2 py-1 text-xs transition disabled:pointer-events-none disabled:opacity-40",
                     draft.status === st
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted hover:bg-muted/80"
@@ -626,9 +711,127 @@ export function BriefDetailClient({ briefId }: Props) {
         </CardContent>
       </Card>
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <MaterialIcon name="fact_check" size={18} />
+              Approval track
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(draft.approvalTrack ?? DEFAULT_APPROVAL_ROWS).map((row, idx) => (
+              <div
+                key={row.role}
+                className="grid gap-2 rounded-lg border border-border/80 p-3 sm:grid-cols-[1fr_auto]"
+              >
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    {APPROVAL_ROLE_LABELS[row.role]}
+                  </Label>
+                  <Input
+                    placeholder="ชื่อผู้อนุมัติ"
+                    value={row.name}
+                    disabled={!canEdit}
+                    onChange={(e) =>
+                      setApprovalRow(idx, { name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="flex flex-col justify-end gap-2 sm:items-end">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={row.approved}
+                      disabled={!canEdit}
+                      onCheckedChange={(c) =>
+                        setApprovalRow(idx, { approved: Boolean(c) })
+                      }
+                    />
+                    อนุมัติแล้ว
+                  </label>
+                  {row.approvedAt && (
+                    <span className="text-[11px] text-muted-foreground">
+                      {format(new Date(row.approvedAt), "dd MMM yyyy HH:mm")}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <MaterialIcon name="history_edu" size={18} />
+              Revision history
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2 sm:grid-cols-[auto_1fr_auto]">
+              <Select
+                value={revRound}
+                disabled={!canEdit}
+                onValueChange={(v) => setRevRound(v as RevisionRound)}
+              >
+                <SelectTrigger className="w-[88px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(["R1", "R2", "R3+"] as RevisionRound[]).map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="บันทึกสิ่งที่ต้องแก้ / feedback"
+                value={revNote}
+                disabled={!canEdit}
+                onChange={(e) => setRevNote(e.target.value)}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!canEdit}
+                className="gap-1"
+                onClick={addRevisionEntry}
+              >
+                <MaterialIcon name="add_comment" size={18} />
+                เพิ่ม
+              </Button>
+            </div>
+            <Separator />
+            <ul className="max-h-60 space-y-3 overflow-y-auto text-sm">
+              {[...(draft.revisionHistory ?? [])]
+                .sort(
+                  (a, b) =>
+                    new Date(b.date).getTime() - new Date(a.date).getTime()
+                )
+                .map((h, i) => (
+                  <li key={`${h.date.toString()}-${i}`} className="rounded-md border bg-muted/40 px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{h.round}</span>
+                      <span>{format(new Date(h.date), "dd MMM yyyy HH:mm")}</span>
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap">{h.note}</p>
+                  </li>
+                ))}
+              {!(draft.revisionHistory?.length) && (
+                <li className="text-xs text-muted-foreground">ยังไม่มีประวัติ revision</li>
+              )}
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">KPI targets ({FUNNEL_CONFIG[draft.funnelStage].label})</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <MaterialIcon name="track_changes" size={18} />
+            KPI targets ({FUNNEL_CONFIG[draft.funnelStage].label})
+          </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           {kpiFields.map(({ key, label, suffix }) => (
@@ -660,7 +863,10 @@ export function BriefDetailClient({ briefId }: Props) {
           >
             Cancel
           </Link>
-          <Button onClick={save}>Save Brief</Button>
+          <Button onClick={save} disabled={!canEdit} className="gap-1">
+            <MaterialIcon name="save" size={18} />
+            Save Brief
+          </Button>
         </div>
       </div>
     </div>

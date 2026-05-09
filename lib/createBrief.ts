@@ -40,5 +40,11 @@ export function createEmptyBrief(existing: Pick<ContentItem, "id">[]): ContentIt
       shareRateTarget: 2,
       watchTimeTarget: 60,
     },
+    approvalTrack: [
+      { role: "creative_lead", name: "", approved: false },
+      { role: "brand_manager", name: "", approved: false },
+      { role: "final", name: "", approved: false },
+    ],
+    revisionHistory: [],
   };
 }

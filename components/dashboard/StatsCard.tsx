@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import type { StatCardKey } from "@/lib/types";
+import { MaterialIcon } from "@/components/ui/material-icon";
 
 interface StatsCardProps {
   title: string;
@@ -11,6 +12,8 @@ interface StatsCardProps {
   active?: boolean;
   statKey: StatCardKey;
   onPress?: (key: StatCardKey) => void;
+  /** Material Symbols icon name (ligature) */
+  symbol?: string;
 }
 
 export function StatsCard({
@@ -20,6 +23,7 @@ export function StatsCard({
   active,
   statKey,
   onPress,
+  symbol,
 }: StatsCardProps) {
   const Icon =
     trend > 0.02 ? ArrowUpRight : trend < -0.02 ? ArrowDownRight : Minus;
@@ -34,7 +38,10 @@ export function StatsCard({
         active && "border-primary ring-2 ring-primary/20"
       )}
     >
-      <span className="text-xs font-medium text-muted-foreground">{title}</span>
+      <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        {symbol ? <MaterialIcon name={symbol} size={18} /> : null}
+        {title}
+      </span>
       <span className="mt-2 text-3xl font-semibold tabular-nums">{value}</span>
       <span className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
         <Icon

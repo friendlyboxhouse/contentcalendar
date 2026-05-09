@@ -13,6 +13,11 @@ import { KPI_REMINDER_DAYS } from "@/lib/constants";
 import { reviveContentItems } from "@/lib/revive";
 import { SEED_DATA } from "@/lib/seedData";
 import { computeDashboardStats } from "@/lib/dashboardStats";
+import {
+  emitBulkUpsert,
+  emitLocalDelete,
+  emitLocalUpsert,
+} from "@/lib/syncBridge";
 
 interface ContentStore {
   items: ContentItem[];
@@ -22,6 +27,10 @@ interface ContentStore {
   updateItem: (id: string, updates: Partial<ContentItem>) => void;
   deleteItem: (id: string) => void;
   undoDelete: () => void;
+
+  replaceAllItems: (items: ContentItem[]) => void;
+  applyRemoteUpsert: (item: ContentItem) => void;
+  removeItemRemote: (id: string) => void;
 
   updateStatus: (id: string, status: ContentStatus) => void;
 
@@ -62,38 +71,72 @@ export const useContentStore = create<ContentStore>()(
       items: [],
       lastDeleted: null,
 
-      addItem: (item) =>
+      addItem: (item) => {
         set((s) => ({
           items: [...s.items, item],
           lastDeleted: null,
-        })),
+        }));
+        emitLocalUpsert(item);
+      },
 
-      updateItem: (id, updates) =>
-        set((s) => ({
-          items: s.items.map((item) =>
+      updateItem: (id, updates) => {
+        let nextFull: ContentItem | undefined;
+        set((s) => {
+          const items = s.items.map((item) =>
             item.id === id
               ? { ...item, ...updates, updatedAt: new Date() }
               : item
-          ),
-        })),
+          );
+          nextFull = items.find((i) => i.id === id);
+          return { items };
+        });
+        if (nextFull) emitLocalUpsert(nextFull);
+      },
 
-      deleteItem: (id) =>
+      deleteItem: (id) => {
         set((s) => {
           const found = s.items.find((i) => i.id === id);
           return {
             items: s.items.filter((i) => i.id !== id),
             lastDeleted: found ?? s.lastDeleted,
           };
-        }),
+        });
+        emitLocalDelete(id);
+      },
 
-      undoDelete: () =>
+      undoDelete: () => {
+        let restored: ContentItem | null = null;
         set((s) => {
           if (!s.lastDeleted) return s;
+          restored = s.lastDeleted;
           return {
             items: [...s.items, s.lastDeleted],
             lastDeleted: null,
           };
+        });
+        if (restored) emitLocalUpsert(restored);
+      },
+
+      replaceAllItems: (items) =>
+        set(() => ({
+          items: reviveContentItems(items),
+          lastDeleted: null,
+        })),
+
+      applyRemoteUpsert: (item) =>
+        set((s) => {
+          const revived = reviveContentItems([item])[0];
+          const exists = s.items.some((i) => i.id === revived.id);
+          const items = exists
+            ? s.items.map((i) => (i.id === revived.id ? revived : i))
+            : [...s.items, revived];
+          return { items };
         }),
+
+      removeItemRemote: (id) =>
+        set((s) => ({
+          items: s.items.filter((i) => i.id !== id),
+        })),
 
       updateStatus: (id, status) => {
         const updates: Partial<ContentItem> = { status };
@@ -130,10 +173,13 @@ export const useContentStore = create<ContentStore>()(
         const revived = reviveContentItems(
           JSON.parse(JSON.stringify(SEED_DATA)) as ContentItem[]
         );
+        let applied = false;
         set((s) => {
           if (!force && s.items.length > 0) return s;
+          applied = true;
           return { items: revived, lastDeleted: null };
         });
+        if (applied) emitBulkUpsert(get().items);
       },
     }),
     {

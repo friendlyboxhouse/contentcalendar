@@ -2,17 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  CalendarDays,
-  ClipboardList,
-  BarChart3,
-  CalendarHeart,
-  Plus,
-  ChevronDown,
-  Moon,
-  Sun,
-} from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -25,14 +15,16 @@ import {
 } from "@/components/ui/collapsible";
 import { useContentStore } from "@/store/contentStore";
 import { useEffect, useState } from "react";
+import { MaterialIcon } from "@/components/ui/material-icon";
+import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 
 const DEMO_KEY = "content-planner-demo-seeded-v1";
 
 const nav = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/briefs", label: "Content Briefs", icon: ClipboardList },
-  { href: "/performance", label: "Performance", icon: BarChart3 },
+  { href: "/", label: "Dashboard", symbol: "dashboard" },
+  { href: "/calendar", label: "Calendar", symbol: "calendar_month" },
+  { href: "/briefs", label: "Content Briefs", symbol: "assignment" },
+  { href: "/performance", label: "Performance", symbol: "analytics" },
 ];
 
 export function SideNav() {
@@ -40,6 +32,7 @@ export function SideNav() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const seedFromDemo = useContentStore((s) => s.seedFromDemo);
+  const { configured, session, signOut, role } = useSupabaseApp();
 
   useEffect(() => setMounted(true), []);
 
@@ -65,7 +58,7 @@ export function SideNav() {
     >
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4 max-xl:items-center max-md:flex-row max-md:gap-2 max-md:p-2 max-md:overflow-visible">
         <div className="flex items-center gap-2 px-1 max-xl:hidden max-md:hidden">
-          <CalendarHeart className="h-8 w-8 text-primary" />
+          <MaterialIcon name="event_available" size={32} className="text-primary" />
           <div>
             <div className="text-sm font-semibold leading-tight">Content Planner</div>
             <div className="text-[10px] text-muted-foreground">DINKR</div>
@@ -73,7 +66,18 @@ export function SideNav() {
         </div>
 
         <nav className="flex flex-col gap-1 max-xl:w-full max-md:flex-row max-md:justify-center">
-          {nav.map(({ href, label, icon: Icon }) => {
+          {[
+            ...nav,
+            ...(configured && session && role === "admin"
+              ? ([
+                  {
+                    href: "/admin/access",
+                    label: "การเข้าถึง",
+                    symbol: "manage_accounts",
+                  },
+                ] as const)
+              : []),
+          ].map(({ href, label, symbol }) => {
             const active =
               href === "/"
                 ? pathname === "/"
@@ -90,7 +94,7 @@ export function SideNav() {
                     : "hover:bg-sidebar-accent"
                 )}
               >
-                <Icon className="h-5 w-5 shrink-0" />
+                <MaterialIcon name={symbol} className="shrink-0" size={22} />
                 <span className="max-xl:hidden max-md:hidden">{label}</span>
               </Link>
             );
@@ -109,7 +113,8 @@ export function SideNav() {
         </Link>
 
         <div className="space-y-3 max-md:hidden">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground max-xl:hidden">
+          <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground max-xl:hidden">
+            <MaterialIcon name="category" size={14} />
             Pillars
           </p>
           <ul className="space-y-1.5 max-xl:space-y-2">
@@ -134,7 +139,10 @@ export function SideNav() {
 
         <Collapsible defaultOpen={false} className="max-md:hidden">
           <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-sidebar-accent">
-            <span className="max-xl:hidden">สถานะ</span>
+            <span className="flex items-center gap-1 max-xl:hidden">
+              <MaterialIcon name="flag" size={14} />
+              สถานะ
+            </span>
             <ChevronDown className="h-4 w-4 max-xl:hidden" />
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-2 space-y-1">
@@ -160,6 +168,29 @@ export function SideNav() {
         </Collapsible>
 
         <div className="mt-auto space-y-3 pt-4 max-md:hidden">
+          {configured && session?.user && (
+            <div className="space-y-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 max-xl:hidden">
+              <div className="flex items-start gap-2 text-xs">
+                <MaterialIcon name="person" size={18} className="mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">
+                    {session.user.email ?? session.user.id.slice(0, 8)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">ซิงค์คลาวด์เปิดอยู่</div>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-1.5 text-xs"
+                type="button"
+                onClick={() => void signOut()}
+              >
+                <MaterialIcon name="logout" size={16} />
+                ออกจากระบบ
+              </Button>
+            </div>
+          )}
           {mounted && (
             <Button
               variant="outline"
@@ -170,11 +201,10 @@ export function SideNav() {
                 setTheme(resolvedTheme === "dark" ? "light" : "dark")
               }
             >
-              {resolvedTheme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
+              <MaterialIcon
+                name={resolvedTheme === "dark" ? "light_mode" : "dark_mode"}
+                size={18}
+              />
               <span className="max-xl:hidden">
                 {theme === "system" ? "ระบบ" : theme === "dark" ? "มืด" : "สว่าง"}
               </span>
@@ -182,13 +212,14 @@ export function SideNav() {
           )}
           <button
             type="button"
-            className="w-full text-left text-[11px] text-muted-foreground underline-offset-2 hover:underline max-xl:hidden"
+            className="flex w-full items-center gap-1 text-left text-[11px] text-muted-foreground underline-offset-2 hover:underline max-xl:hidden"
             onClick={resetDemo}
           >
+            <MaterialIcon name="restart_alt" size={14} />
             Reset เป็นข้อมูลตัวอย่าง
           </button>
           <div className="text-[10px] text-muted-foreground max-xl:hidden">
-            v1.0.0
+            v1.1.0
           </div>
         </div>
       </div>

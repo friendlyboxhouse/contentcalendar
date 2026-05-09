@@ -16,6 +16,7 @@ import { filterContentItems } from "@/lib/filterContent";
 import { computeDashboardStats } from "@/lib/dashboardStats";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { MaterialIcon } from "@/components/ui/material-icon";
 
 function nearestDeadline(item: ContentItem): { label: string; date: Date } {
   const candidates: { label: string; date: Date }[] = [
@@ -127,13 +128,19 @@ export function DashboardClient() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+            <MaterialIcon name="dashboard" size={26} />
+            Dashboard
+          </h1>
           <p className="text-sm text-muted-foreground">
             สรุปคอนเทนต์ สถานะ และ KPI ที่ต้องตาม
           </p>
         </div>
         <Link href="/briefs/new">
-          <Button size="sm">+ New Brief</Button>
+          <Button size="sm" className="gap-1.5">
+            <MaterialIcon name="post_add" size={18} />
+            New Brief
+          </Button>
         </Link>
       </div>
 
@@ -152,6 +159,7 @@ export function DashboardClient() {
           statKey="total"
           active={activeStat === "total"}
           onPress={onStatPress}
+          symbol="dataset"
         />
         <StatsCard
           title="In Stock"
@@ -160,6 +168,7 @@ export function DashboardClient() {
           statKey="inStock"
           active={activeStat === "inStock"}
           onPress={onStatPress}
+          symbol="inventory_2"
         />
         <StatsCard
           title="Pending Approval"
@@ -168,6 +177,7 @@ export function DashboardClient() {
           statKey="pendingApproval"
           active={activeStat === "pendingApproval"}
           onPress={onStatPress}
+          symbol="pending_actions"
         />
         <StatsCard
           title="Needs Rework"
@@ -176,6 +186,7 @@ export function DashboardClient() {
           statKey="needsRework"
           active={activeStat === "needsRework"}
           onPress={onStatPress}
+          symbol="build"
         />
         <StatsCard
           title="Planned"
@@ -184,6 +195,7 @@ export function DashboardClient() {
           statKey="planned"
           active={activeStat === "planned"}
           onPress={onStatPress}
+          symbol="event_note"
         />
       </div>
 
@@ -196,7 +208,10 @@ export function DashboardClient() {
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">
         <div className="rounded-xl border bg-card p-4 shadow-sm">
-          <h3 className="mb-3 text-sm font-semibold">Deadline ถัดไป</h3>
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+            <MaterialIcon name="schedule" size={18} />
+            Deadline ถัดไป
+          </h3>
           <ul className="space-y-3">
             {upcoming.map(({ item, label, date }) => (
               <li key={item.id} className="flex flex-col gap-1 border-b pb-3 last:border-0">
@@ -216,7 +231,10 @@ export function DashboardClient() {
         </div>
 
         <div className="rounded-xl border bg-card p-4 shadow-sm">
-          <h3 className="mb-3 text-sm font-semibold">Recent activity</h3>
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+            <MaterialIcon name="history" size={18} />
+            Recent activity
+          </h3>
           <ul className="space-y-2 text-sm">
             {recent.map(({ item, msg }) => (
               <li key={`${item.id}-${item.updatedAt.toString()}`}>
