@@ -51,7 +51,15 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/login") || pathname.startsWith("/auth");
 
   const withNoStore = (res: NextResponse) => {
-    res.headers.set("Cache-Control", "no-store, must-revalidate");
+    /**
+     * private — บอกแคชระดับโปรซี่/CDN ว่าอย่าเก็บ HTML/RSC ของหน้าที่ผูกกับ session ไว้แชร์กัน
+     * Vary: Cookie — กัน CDN ที่แคชตาม URL อย่างเดียว เสิร์ฟ HTML ที่คนละสถานะล็อกอินให้กัน
+     */
+    res.headers.set(
+      "Cache-Control",
+      "private, no-store, must-revalidate",
+    );
+    res.headers.set("Vary", "Cookie, Accept-Encoding");
     return res;
   };
 
