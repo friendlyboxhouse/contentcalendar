@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   PILLAR_CONFIG,
   STATUS_CONFIG,
@@ -23,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { cn } from "@/lib/utils";
 
 export type FilterOption =
@@ -44,6 +46,21 @@ interface FilterBarProps {
   className?: string;
 }
 
+const EMPTY: PlannerFilters = {
+  pillar: "all",
+  platform: "all",
+  status: "all",
+  format: "all",
+  month: "all",
+  owner: "all",
+  funnelStage: "all",
+  kpiFilter: "all",
+};
+
+function countActive(filters: PlannerFilters) {
+  return Object.values(filters).filter((v) => v && v !== "all").length;
+}
+
 export function FilterBar({
   filters,
   onChange,
@@ -52,242 +69,275 @@ export function FilterBar({
   owners = [],
   className,
 }: FilterBarProps) {
+  const [expanded, setExpanded] = useState(false);
   const patch = (partial: Partial<PlannerFilters>) =>
     onChange({ ...filters, ...partial });
 
-  const active =
-    (filters.pillar && filters.pillar !== "all") ||
-    (filters.platform && filters.platform !== "all") ||
-    (filters.status && filters.status !== "all") ||
-    (filters.format && filters.format !== "all") ||
-    (filters.month && filters.month !== "all") ||
-    (filters.owner && filters.owner !== "all") ||
-    (filters.funnelStage && filters.funnelStage !== "all") ||
-    (filters.kpiFilter && filters.kpiFilter !== "all");
+  const activeCount = countActive(filters);
+  const hasFilters = activeCount > 0;
+
+  // Split options: first 2 always visible, rest behind "more"
+  const alwaysVisible = options.slice(0, 2);
+  const extra = options.slice(2);
+  const showExpand = extra.length > 0;
+
+  const renderSelect = (opt: FilterOption) => {
+    switch (opt) {
+      case "status":
+        return (
+          <Select
+            key="status"
+            value={filters.status ?? "all"}
+            onValueChange={(v) =>
+              patch({ status: v === "all" ? "all" : (v as ContentStatus) })
+            }
+          >
+            <SelectTrigger className="h-9 min-w-[150px] text-sm">
+              <SelectValue placeholder="สถานะ" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทุกสถานะ</SelectItem>
+              {CONTENT_STATUSES_ORDERED.map((key) => {
+                const s = STATUS_CONFIG[key];
+                return (
+                  <SelectItem key={key} value={key}>
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="h-2 w-2 rounded-full shrink-0"
+                        style={{ backgroundColor: s.dotColor }}
+                      />
+                      {s.emoji} {s.label}
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        );
+
+      case "pillar":
+        return (
+          <Select
+            key="pillar"
+            value={filters.pillar ?? "all"}
+            onValueChange={(v) =>
+              patch({ pillar: v === "all" ? "all" : (v as ContentPillar) })
+            }
+          >
+            <SelectTrigger className="h-9 min-w-[140px] text-sm">
+              <SelectValue placeholder="หมวด" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทุกหมวด</SelectItem>
+              {(Object.keys(PILLAR_CONFIG) as ContentPillar[]).map((key) => {
+                const c = PILLAR_CONFIG[key];
+                return (
+                  <SelectItem key={key} value={key}>
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="h-2 w-2 rounded-full shrink-0"
+                        style={{ backgroundColor: c.color }}
+                      />
+                      {c.emoji} {c.label}
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        );
+
+      case "platform":
+        return (
+          <Select
+            key="platform"
+            value={filters.platform ?? "all"}
+            onValueChange={(v) =>
+              patch({ platform: v === "all" ? "all" : (v as Platform) })
+            }
+          >
+            <SelectTrigger className="h-9 min-w-[140px] text-sm">
+              <SelectValue placeholder="แพลตฟอร์ม" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทุกแพลตฟอร์ม</SelectItem>
+              {(Object.keys(PLATFORM_LABELS) as Platform[]).map((p) => (
+                <SelectItem key={p} value={p}>
+                  {PLATFORM_LABELS[p]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+
+      case "format":
+        return (
+          <Select
+            key="format"
+            value={filters.format ?? "all"}
+            onValueChange={(v) =>
+              patch({ format: v === "all" ? "all" : (v as ContentFormat) })
+            }
+          >
+            <SelectTrigger className="h-9 min-w-[130px] text-sm">
+              <SelectValue placeholder="ฟอร์แมต" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทุกฟอร์แมต</SelectItem>
+              {(Object.keys(FORMAT_LABELS) as ContentFormat[]).map((f) => (
+                <SelectItem key={f} value={f}>
+                  {FORMAT_LABELS[f]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+
+      case "month":
+        return (
+          <Select
+            key="month"
+            value={filters.month ?? "all"}
+            onValueChange={(v) => patch({ month: v ?? "all" })}
+          >
+            <SelectTrigger className="h-9 min-w-[130px] text-sm">
+              <SelectValue placeholder="เดือน" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทุกเดือน</SelectItem>
+              {monthOptions.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+
+      case "owner":
+        return (
+          <Select
+            key="owner"
+            value={filters.owner ?? "all"}
+            onValueChange={(v) => patch({ owner: v ?? "all" })}
+          >
+            <SelectTrigger className="h-9 min-w-[120px] text-sm">
+              <SelectValue placeholder="ผู้รับผิดชอบ" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทุกคน</SelectItem>
+              {owners.map((o) => (
+                <SelectItem key={o} value={o}>
+                  {o}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+
+      case "funnelStage":
+        return (
+          <Select
+            key="funnelStage"
+            value={filters.funnelStage ?? "all"}
+            onValueChange={(v) =>
+              patch({ funnelStage: v === "all" ? "all" : (v as FunnelStage) })
+            }
+          >
+            <SelectTrigger className="h-9 min-w-[140px] text-sm">
+              <SelectValue placeholder="Funnel" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทุก Funnel</SelectItem>
+              <SelectItem value="awareness">Awareness</SelectItem>
+              <SelectItem value="consideration">Consideration</SelectItem>
+              <SelectItem value="conversion">Conversion</SelectItem>
+              <SelectItem value="loyalty">Loyalty</SelectItem>
+            </SelectContent>
+          </Select>
+        );
+
+      case "kpiFilter":
+        return (
+          <Select
+            key="kpiFilter"
+            value={filters.kpiFilter ?? "all"}
+            onValueChange={(v) =>
+              patch({ kpiFilter: (v ?? "all") as PlannerFilters["kpiFilter"] })
+            }
+          >
+            <SelectTrigger className="h-9 min-w-[150px] text-sm">
+              <SelectValue placeholder="KPI" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">KPI ทั้งหมด</SelectItem>
+              <SelectItem value="passed">ผ่านครบ</SelectItem>
+              <SelectItem value="failed">มีที่ไม่ผ่าน</SelectItem>
+              <SelectItem value="not_reviewed">ยังไม่รีวิว</SelectItem>
+            </SelectContent>
+          </Select>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
-    <div
-      className={cn(
-        "flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 shadow-sm",
-        className
-      )}
-    >
-      {options.includes("pillar") && (
-        <Select
-          value={filters.pillar ?? "all"}
-          onValueChange={(v) => {
-            const nv = v ?? "all";
-            patch({
-              pillar: nv === "all" ? "all" : (nv as ContentPillar),
-            });
-          }}
-        >
-          <SelectTrigger className="min-w-[140px]">
-            <SelectValue placeholder="Pillar" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">ทุก Pillar</SelectItem>
-            {(Object.keys(PILLAR_CONFIG) as ContentPillar[]).map((key) => {
-              const c = PILLAR_CONFIG[key];
-              return (
-                <SelectItem key={key} value={key}>
-                  <span className="flex items-center gap-2">
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: c.color }}
-                    />
-                    {c.emoji} {c.label}
-                  </span>
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      {/* Always-visible selects */}
+      {alwaysVisible.map(renderSelect)}
+
+      {/* Expandable extra selects */}
+      {showExpand && (
+        <>
+          <Button
+            type="button"
+            variant={expanded || extra.some((opt) => {
+              const v = filters[opt as keyof PlannerFilters];
+              return v && v !== "all";
+            }) ? "secondary" : "outline"}
+            size="sm"
+            className="h-9 gap-1.5 text-sm"
+            onClick={() => setExpanded((e) => !e)}
+          >
+            <MaterialIcon name="tune" size={16} />
+            <span className="hidden sm:inline">ตัวกรองเพิ่มเติม</span>
+            {extra.filter((opt) => {
+              const v = filters[opt as keyof PlannerFilters];
+              return v && v !== "all";
+            }).length > 0 && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                {extra.filter((opt) => {
+                  const v = filters[opt as keyof PlannerFilters];
+                  return v && v !== "all";
+                }).length}
+              </span>
+            )}
+            <MaterialIcon
+              name={expanded ? "expand_less" : "expand_more"}
+              size={16}
+              className="opacity-70"
+            />
+          </Button>
+          {expanded && extra.map(renderSelect)}
+        </>
       )}
 
-      {options.includes("platform") && (
-        <Select
-          value={filters.platform ?? "all"}
-          onValueChange={(v) => {
-            const nv = v ?? "all";
-            patch({
-              platform: nv === "all" ? "all" : (nv as Platform),
-            });
-          }}
-        >
-          <SelectTrigger className="min-w-[140px]">
-            <SelectValue placeholder="Platform" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">ทุกแพลตฟอร์ม</SelectItem>
-            {(Object.keys(PLATFORM_LABELS) as Platform[]).map((p) => (
-              <SelectItem key={p} value={p}>
-                {PLATFORM_LABELS[p]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {options.includes("status") && (
-        <Select
-          value={filters.status ?? "all"}
-          onValueChange={(v) => {
-            const nv = v ?? "all";
-            patch({
-              status: nv === "all" ? "all" : (nv as ContentStatus),
-            });
-          }}
-        >
-          <SelectTrigger className="min-w-[160px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">ทุกสถานะ</SelectItem>
-            {CONTENT_STATUSES_ORDERED.map((key) => {
-              const s = STATUS_CONFIG[key];
-              return (
-                <SelectItem key={key} value={key}>
-                  <span className="flex items-center gap-2">
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: s.dotColor }}
-                    />
-                    {s.emoji} {s.label}
-                  </span>
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-      )}
-
-      {options.includes("format") && (
-        <Select
-          value={filters.format ?? "all"}
-          onValueChange={(v) => {
-            const nv = v ?? "all";
-            patch({
-              format: nv === "all" ? "all" : (nv as ContentFormat),
-            });
-          }}
-        >
-          <SelectTrigger className="min-w-[140px]">
-            <SelectValue placeholder="Format" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">ทุกฟอร์แมต</SelectItem>
-            {(Object.keys(FORMAT_LABELS) as ContentFormat[]).map((f) => (
-              <SelectItem key={f} value={f}>
-                {FORMAT_LABELS[f]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {options.includes("month") && (
-        <Select
-          value={filters.month ?? "all"}
-          onValueChange={(v) => patch({ month: v ?? "all" })}
-        >
-          <SelectTrigger className="min-w-[140px]">
-            <SelectValue placeholder="เดือน" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">ทุกเดือน</SelectItem>
-            {monthOptions.map((m) => (
-              <SelectItem key={m.value} value={m.value}>
-                {m.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {options.includes("owner") && (
-        <Select
-          value={filters.owner ?? "all"}
-          onValueChange={(v) => patch({ owner: v ?? "all" })}
-        >
-          <SelectTrigger className="min-w-[120px]">
-            <SelectValue placeholder="Owner" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">ทุก Owner</SelectItem>
-            {owners.map((o) => (
-              <SelectItem key={o} value={o}>
-                {o}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {options.includes("funnelStage") && (
-        <Select
-          value={filters.funnelStage ?? "all"}
-          onValueChange={(v) => {
-            const nv = v ?? "all";
-            patch({
-              funnelStage: nv === "all" ? "all" : (nv as FunnelStage),
-            });
-          }}
-        >
-          <SelectTrigger className="min-w-[150px]">
-            <SelectValue placeholder="Funnel" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">ทุก Funnel</SelectItem>
-            <SelectItem value="awareness">Awareness</SelectItem>
-            <SelectItem value="consideration">Consideration</SelectItem>
-            <SelectItem value="conversion">Conversion</SelectItem>
-            <SelectItem value="loyalty">Loyalty</SelectItem>
-          </SelectContent>
-        </Select>
-      )}
-
-      {options.includes("kpiFilter") && (
-        <Select
-          value={filters.kpiFilter ?? "all"}
-          onValueChange={(v) =>
-            patch({
-              kpiFilter: (v ?? "all") as PlannerFilters["kpiFilter"],
-            })
-          }
-        >
-          <SelectTrigger className="min-w-[170px]">
-            <SelectValue placeholder="KPI" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">KPI ทั้งหมด</SelectItem>
-            <SelectItem value="passed">ผ่านครบ</SelectItem>
-            <SelectItem value="failed">มีที่ไม่ผ่าน</SelectItem>
-            <SelectItem value="not_reviewed">ยังไม่รีวิว</SelectItem>
-          </SelectContent>
-        </Select>
-      )}
-
-      {active && (
+      {/* Clear button with active count */}
+      {hasFilters && (
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="text-muted-foreground"
-          onClick={() =>
-            onChange({
-              pillar: "all",
-              platform: "all",
-              status: "all",
-              format: "all",
-              month: "all",
-              owner: "all",
-              funnelStage: "all",
-              kpiFilter: "all",
-            })
-          }
+          className="h-9 gap-1 text-sm text-muted-foreground hover:text-foreground"
+          onClick={() => onChange(EMPTY)}
         >
-          ล้างตัวกรอง
+          <MaterialIcon name="filter_alt_off" size={16} />
+          <span className="hidden sm:inline">ล้างตัวกรอง</span>
+          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[10px] font-medium">
+            {activeCount}
+          </span>
         </Button>
       )}
     </div>

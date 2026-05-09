@@ -3,7 +3,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import type { ContentItem } from "@/lib/types";
-import { PILLAR_CONFIG, FORMAT_LABELS, PLATFORM_LABELS } from "@/lib/constants";
+import { PILLAR_CONFIG, FORMAT_LABELS } from "@/lib/constants";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { CountdownTimer } from "@/components/shared/CountdownTimer";
 import { cn } from "@/lib/utils";
@@ -30,11 +30,6 @@ export function ContentChip({
     borderLeftColor: pillarColor,
   };
 
-  const plat = item.platform
-    .map((p) => PLATFORM_LABELS[p] ?? p)
-    .slice(0, 2)
-    .join(", ");
-
   return (
     <div
       ref={setNodeRef}
@@ -48,19 +43,21 @@ export function ContentChip({
       }}
       style={style}
       className={cn(
-        "mb-1.5 cursor-pointer rounded-md border border-border bg-background px-2 py-1.5 text-left shadow-sm transition hover:shadow-md",
+        "mb-1.5 cursor-pointer rounded-lg border border-border bg-card px-2 py-2 text-left shadow-sm transition-all hover:shadow-md hover:-translate-y-px",
         draggable && "touch-none",
-        "border-l-[4px]"
+        "border-l-[3px]"
       )}
     >
-      <div className="text-[10px] font-medium text-muted-foreground">{item.id}</div>
-      <div className="line-clamp-2 text-xs font-medium leading-snug">
+      {/* Topic — min text-xs */}
+      <div className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
         {item.topic || "(ไม่มีหัวข้อ)"}
       </div>
-      <div className="mt-0.5 text-[10px] text-muted-foreground">
-        {FORMAT_LABELS[item.format]} · {plat}
+      {/* Format */}
+      <div className="mt-0.5 text-[11px] text-muted-foreground leading-tight">
+        {FORMAT_LABELS[item.format]}
       </div>
-      <div className="mt-1 flex flex-wrap items-center gap-1">
+      {/* Status + countdown row */}
+      <div className="mt-1.5 flex flex-wrap items-center gap-1">
         <span onClick={(e) => e.stopPropagation()}>
           <StatusBadge status={item.status} editable={false} />
         </span>

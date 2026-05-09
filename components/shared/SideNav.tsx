@@ -131,8 +131,8 @@ export function SideNav() {
                   "max-xl:justify-center max-xl:px-2 max-xl:rounded-lg",
                   "max-md:flex max-md:min-h-[52px] max-md:min-w-[44px] max-md:flex-1 max-md:flex-col max-md:justify-center max-md:gap-1 max-md:px-1 max-md:py-2",
                   active
-                    ? "bg-primary text-primary-foreground shadow-sm dark:bg-white dark:text-slate-900"
-                    : "hover:bg-sidebar-accent max-md:active:scale-[0.98]"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground max-md:active:scale-[0.98]"
                 )}
               >
                 <MaterialIcon name={symbol} className="shrink-0" size={24} />

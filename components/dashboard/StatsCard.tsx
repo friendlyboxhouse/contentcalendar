@@ -38,23 +38,32 @@ export function StatsCard({
       type="button"
       onClick={() => onPress?.(statKey)}
       className={cn(
-        "flex min-h-[44px] flex-1 flex-col rounded-xl border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md min-w-[140px]",
-        active && "border-primary ring-2 ring-primary/20"
+        "flex flex-col rounded-xl border bg-card p-4 text-left shadow-sm transition-all",
+        "hover:border-primary/50 hover:shadow-md hover:-translate-y-px",
+        active && "border-primary ring-2 ring-primary/20 shadow-md"
       )}
     >
       <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        {symbol ? <MaterialIcon name={symbol} size={18} /> : null}
+        {symbol ? (
+          <MaterialIcon
+            name={symbol}
+            size={16}
+            className={active ? "text-primary" : ""}
+          />
+        ) : null}
         {title}
       </span>
-      <span className="mt-2 text-3xl font-semibold tabular-nums">{value}</span>
+      <span className={cn("mt-2 text-3xl font-bold tabular-nums", active && "text-primary")}>
+        {value}
+      </span>
       <span className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
         <MaterialIcon
           name={trendIconName}
-          size={16}
+          size={14}
           className={cn(
             trendUp && "text-emerald-600",
-            trendDown && "text-red-600",
-            !trendUp && !trendDown && "opacity-60"
+            trendDown && "text-red-500",
+            !trendUp && !trendDown && "opacity-50"
           )}
         />
         เทียบเดือนก่อน {trendLabel}

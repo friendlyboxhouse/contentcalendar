@@ -28,7 +28,7 @@ export function EmptyState({
         className
       )}
     >
-      <span aria-hidden className="mb-3 inline-flex text-muted-foreground/70">
+      <span aria-hidden className="mb-3 inline-flex rounded-full bg-primary/10 p-3 text-primary/60">
         <MaterialIcon name={icon} size={iconSize} />
       </span>
       <h2

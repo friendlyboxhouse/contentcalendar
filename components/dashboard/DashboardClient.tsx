@@ -119,17 +119,14 @@ export function DashboardClient() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-              <MaterialIcon name="dashboard" size={26} />
-              ภาพรวม
-            </h1>
+            <h1 className="text-2xl font-bold tracking-tight">ภาพรวม</h1>
             <p className="text-sm text-muted-foreground">
               สรุปคอนเทนต์ สถานะ และ KPI ที่ต้องตาม
             </p>
           </div>
           <Link href="/briefs/new">
             <Button size="sm" className="gap-1.5">
-              <MaterialIcon name="post_add" size={18} />
+              <MaterialIcon name="add" size={16} />
               สร้างบรีฟใหม่
             </Button>
           </Link>
@@ -177,10 +174,7 @@ export function DashboardClient() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-            <MaterialIcon name="dashboard" size={26} />
-            ภาพรวม
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">ภาพรวม</h1>
           <p className="text-sm text-muted-foreground">
             สรุปคอนเทนต์ สถานะ และ KPI ที่ต้องตาม
           </p>
@@ -200,7 +194,7 @@ export function DashboardClient() {
         monthOptions={monthOptions}
       />
 
-      <div className="flex flex-wrap gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatsCard
           title="คอนเทนต์ทั้งหมด"
           value={stats.total}
@@ -220,7 +214,7 @@ export function DashboardClient() {
           symbol="inventory_2"
         />
         <StatsCard
-          title="Pending Approval"
+          title="รออนุมัติ"
           value={stats.pendingApproval}
           trend={pseudoTrend("pend", stats.pendingApproval)}
           statKey="pendingApproval"
@@ -269,8 +263,8 @@ export function DashboardClient() {
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">
         <div className="rounded-xl border bg-card p-4 shadow-sm">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <MaterialIcon name="schedule" size={18} />
-            Deadline ถัดไป
+            <MaterialIcon name="schedule" size={18} className="text-primary" />
+            เดดไลน์ถัดไป
           </h3>
           <ul className="space-y-3">
             {upcoming.length === 0 ? (
@@ -301,8 +295,8 @@ export function DashboardClient() {
 
         <div className="rounded-xl border bg-card p-4 shadow-sm">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <MaterialIcon name="history" size={18} />
-            Recent activity
+            <MaterialIcon name="history" size={18} className="text-primary" />
+            กิจกรรมล่าสุด
           </h3>
           <ul className="space-y-2 text-sm">
             {recent.length === 0 ? (

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { useContentStore } from "@/store/contentStore";
-import type { ContentStatus, PlannerFilters } from "@/lib/types";
+import type { ContentItem, ContentStatus, PlannerFilters } from "@/lib/types";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,26 @@ import { cn, generatePostId } from "@/lib/utils";
 import { reviveContentItem } from "@/lib/revive";
 import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+function getNearestDeadline(item: ContentItem): { label: string; date: Date } | null {
+  const now = Date.now();
+  const candidates = [
+    { label: "บรีฟ", date: new Date(item.briefDeadline) },
+    { label: "อนุมัติ", date: new Date(item.approvalDeadline) },
+    { label: "เผยแพร่", date: new Date(item.publishDate) },
+  ].filter((c) => c.date.getTime() > now).sort((a, b) => a.date.getTime() - b.date.getTime());
+  if (candidates.length) return candidates[0];
+  // All past — show publish date anyway
+  return { label: "เผยแพร่", date: new Date(item.publishDate) };
+}
 
 function BriefsInner() {
   const router = useRouter();
@@ -35,6 +55,7 @@ function BriefsInner() {
   const searchParams = useSearchParams();
   const fsParam = searchParams.get("fs");
 
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<PlannerFilters>({
     pillar: "all",
@@ -89,8 +110,41 @@ function BriefsInner() {
     toast.success(`คัดลอกเป็น ${copy.id}`);
   };
 
+  const handleDeleteConfirm = () => {
+    if (!deleteTarget) return;
+    deleteItem(deleteTarget);
+    toast.success(`ลบ ${deleteTarget} แล้ว`, {
+      action: {
+        label: "เลิกทำ",
+        onClick: () => useContentStore.getState().undoDelete(),
+      },
+    });
+    setDeleteTarget(null);
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>ลบบรีฟนี้?</DialogTitle>
+            <DialogDescription>
+              บรีฟ <span className="font-mono font-semibold">{deleteTarget}</span> จะถูกลบออก — ยังสามารถเลิกทำได้ทันทีหลังจากนี้
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>ยกเลิก</Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+            >
+              ลบ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">คอนเทนต์บรีฟ</h1>
@@ -99,27 +153,35 @@ function BriefsInner() {
           </p>
         </div>
         <Link href="/briefs/new">
-          <Button size="sm">สร้างบรีฟใหม่</Button>
+          <Button size="sm" className="gap-1.5">
+            <MaterialIcon name="add" size={16} />
+            สร้างบรีฟใหม่
+          </Button>
         </Link>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <MaterialIcon name="search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="ค้นหา Topic หรือ POST-ID…"
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         <FilterBar
           filters={filters}
           onChange={setFilters}
           options={["status", "pillar", "owner", "platform", "format"]}
           owners={owners}
         />
-        <Input
-          placeholder="ค้นหา Topic หรือ POST-ID..."
-          className="max-w-xs flex-1 min-w-[200px]"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
       </div>
 
       <div className="space-y-3">
-        {filtered.map((item) => (
+        {filtered.map((item) => {
+          const nearest = getNearestDeadline(item);
+          return (
             <Card
               key={item.id}
               role="button"
@@ -129,13 +191,14 @@ function BriefsInner() {
                 if (e.key === "Enter" || e.key === " ")
                   router.push(`/briefs/${item.id}`);
               }}
-              className="overflow-hidden border-l-[4px] cursor-pointer transition hover:shadow-md"
+              className="overflow-hidden border-l-[4px] cursor-pointer transition-all hover:shadow-md hover:-translate-y-px"
               style={{ borderLeftColor: PILLAR_CONFIG[item.pillar].color }}
             >
-              <div className="flex flex-wrap items-start justify-between gap-3 p-4">
-                <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex items-start justify-between gap-3 p-4">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  {/* Row 1: meta tags */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-muted-foreground">
+                    <span className="font-mono text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                       {item.id}
                     </span>
                     <PillarTag pillar={item.pillar} size="sm" />
@@ -153,90 +216,58 @@ function BriefsInner() {
                       />
                     </span>
                   </div>
-                  <p className="text-base font-semibold leading-snug">
+                  {/* Row 2: topic */}
+                  <p className="text-sm font-semibold leading-snug">
                     {item.topic || "(ไม่มีหัวข้อ)"}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {FORMAT_LABELS[item.format]} ·{" "}
-                    {item.platform.map((p) => PLATFORM_LABELS[p]).join(", ")} ·
-                    Owner: {item.owner} · Publish:{" "}
-                    {new Date(item.publishDate).toLocaleDateString("th-TH")}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <CountdownTimer
-                      label="Brief Due"
-                      targetDate={new Date(item.briefDeadline)}
-                      compact
-                    />
-                    <CountdownTimer
-                      label="Approval Due"
-                      targetDate={new Date(item.approvalDeadline)}
-                      compact
-                    />
-                    <CountdownTimer
-                      label="Publish"
-                      targetDate={new Date(item.publishDate)}
-                      compact
-                    />
+                  {/* Row 3: sub-meta + single countdown */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span>{FORMAT_LABELS[item.format]}</span>
+                    <span>{item.platform.map((p) => PLATFORM_LABELS[p]).join(", ")}</span>
+                    <span>ผู้รับผิดชอบ: {item.owner}</span>
+                    {nearest && (
+                      <CountdownTimer
+                        label={nearest.label}
+                        targetDate={nearest.date}
+                        compact
+                      />
+                    )}
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-1">
+                {/* Actions */}
+                <div className="flex shrink-0 items-center gap-0.5">
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="max-md:min-h-11 max-md:min-w-11"
-                    aria-label={`เปิดบรีฟ ${item.id}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/briefs/${item.id}`);
-                    }}
-                  >
-                    <MaterialIcon
-                      name="arrow_forward"
-                      size={20}
-                      className="text-foreground"
-                    />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="max-md:min-h-11 max-md:min-w-11"
+                    size="icon-sm"
+                    className="max-md:min-h-10 max-md:min-w-10"
                     aria-label={`คัดลอกบรีฟ ${item.id}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      duplicate(item.id);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); duplicate(item.id); }}
                   >
-                    <MaterialIcon name="content_copy" size={20} />
+                    <MaterialIcon name="content_copy" size={18} />
                   </Button>
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="max-md:min-h-11 max-md:min-w-11"
+                    size="icon-sm"
+                    className="max-md:min-h-10 max-md:min-w-10 text-destructive hover:text-destructive"
                     aria-label={`ลบ ${item.id}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!confirm(`ลบ ${item.id}?`)) return;
-                      deleteItem(item.id);
-                      toast.success(`ลบ ${item.id}`, {
-                        action: {
-                          label: "เลิกทำ",
-                          onClick: () =>
-                            useContentStore.getState().undoDelete(),
-                        },
-                      });
-                    }}
+                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(item.id); }}
                   >
-                    <MaterialIcon
-                      name="delete"
-                      size={20}
-                      className="text-destructive"
-                    />
+                    <MaterialIcon name="delete" size={18} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="max-md:min-h-10 max-md:min-w-10"
+                    aria-label={`เปิดบรีฟ ${item.id}`}
+                    onClick={(e) => { e.stopPropagation(); router.push(`/briefs/${item.id}`); }}
+                  >
+                    <MaterialIcon name="arrow_forward" size={18} className="text-primary" />
                   </Button>
                 </div>
               </div>
             </Card>
-        ))}
+          );
+        })}
       </div>
 
       {!filtered.length && (
@@ -247,8 +278,9 @@ function BriefsInner() {
         >
           <Link
             href="/briefs/new"
-            className={cn(buttonVariants({ size: "sm" }), "no-underline")}
+            className={cn(buttonVariants({ size: "sm" }), "no-underline gap-1.5")}
           >
+            <MaterialIcon name="add" size={16} />
             สร้างบรีฟใหม่
           </Link>
         </EmptyState>
