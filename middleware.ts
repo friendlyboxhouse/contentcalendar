@@ -60,6 +60,8 @@ export async function middleware(request: NextRequest) {
       "private, no-store, must-revalidate",
     );
     res.headers.set("Vary", "Cookie, Accept-Encoding");
+    /** ตรวจบนโฮสต์ว่า Edge middleware ทำงานจริง — ถ้าไม่เห็น header นี้ คำขอไม่ได้ผ่าน Next middleware */
+    res.headers.set("x-cp-middleware", "1");
     return res;
   };
 
