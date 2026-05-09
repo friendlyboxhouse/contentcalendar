@@ -10,7 +10,6 @@ import {
   allowlistDenialToQueryParam,
 } from "@/lib/supabase/emailAllowlist";
 import { buildSafeRedirectUrl } from "@/lib/publicSiteOrigin";
-import { hostLooksProductionLike } from "@/lib/hostFromRequest";
 
 function supabaseConfigured(): boolean {
   return isSupabaseConfigured();
@@ -24,12 +23,11 @@ export async function middleware(request: NextRequest) {
 
   /**
    * ไม่มี Supabase env:
-   * - โลคัล dev → บังคับไป /login (ห้าม SSR หน้าแอปเปล่าๆ)
-   * - โดเมนจริงแต่ยังไม่ตั้งคลาวด์ → ปล่อยเข้าแอปให้ ClientAuthGate โชว์ ProductionCloudRequired
+   * — redirect ทุกเส้นทางที่ไม่ใช่ login/auth ไป `/login` (รวมโดเมนโปรดักชัน)
+   *   เพื่อให้หน้าแรกเห็นฟอร์มล็อกอินหรือการ์ดแจ้งใส่ env — ไม่เปิดแอปหลักแบบว่าง
    */
   if (!supabaseConfigured()) {
-    const prodLike = hostLooksProductionLike(request);
-    if (!prodLike && !isAuthRoute) {
+    if (!isAuthRoute) {
       const loginUrl = buildSafeRedirectUrl(request, "/login");
       if (loginUrl) {
         loginUrl.searchParams.set("next", nextParam || "/");

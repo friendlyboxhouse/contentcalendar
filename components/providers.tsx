@@ -5,7 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { useContentStore } from "@/store/contentStore";
 import { useKPIReminder } from "@/hooks/useKPIReminder";
-import { CommandPalette } from "@/components/command-palette";
+import { CommandPaletteGate } from "@/components/command-palette-gate";
 import { DEMO_KEY } from "@/components/shared/SideNav";
 import { SupabaseAppProvider } from "@/components/supabase/SupabaseAppProvider";
 import type { SupabasePublicEnv } from "@/lib/supabase/config";
@@ -60,7 +60,7 @@ export function Providers({
       <SupabaseAppProvider supabasePublic={supabasePublic}>
         {children}
         <Toaster richColors position="top-center" />
-        <CommandPalette />
+        <CommandPaletteGate />
       </SupabaseAppProvider>
     </ThemeProvider>
   );
