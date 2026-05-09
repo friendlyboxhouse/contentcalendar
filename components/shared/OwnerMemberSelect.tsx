@@ -1,0 +1,88 @@
+"use client";
+
+import type { WorkspaceMemberRow } from "@/components/supabase/SupabaseAppProvider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+
+export function memberLabel(m: WorkspaceMemberRow): string {
+  const name = m.display_name?.trim();
+  const em = m.email?.trim();
+  if (name && em) return `${name} (${em})`;
+  if (name) return name;
+  if (em) return em;
+  return m.user_id.slice(0, 8) + "…";
+}
+
+/** ค่าที่เก็บใน ContentItem.owner เวลาเลือกจากทีม — normalize เพื่อลด typo */
+export function ownerStoredFromMember(m: WorkspaceMemberRow): string {
+  const dn = m.display_name?.trim();
+  if (dn) return dn;
+  const em = m.email?.trim();
+  if (em) return em;
+  return memberLabel(m);
+}
+
+export function OwnerMemberSelect({
+  members,
+  ownerDisplay,
+  onPickMember,
+  disabled,
+  className,
+}: {
+  members: WorkspaceMemberRow[];
+  /** ข้อความ owner ที่เก็บใน brief (อาจเป็น legacy ที่ไม่อยู่ในรายชื่อทีม) */
+  ownerDisplay: string;
+  onPickMember: (m: WorkspaceMemberRow) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const trimmedOwner = ownerDisplay.trim();
+  const match = members.find(
+    (m) => ownerStoredFromMember(m) === trimmedOwner
+  );
+  const legacy = Boolean(trimmedOwner) && !match;
+
+  const selectValue =
+    match?.user_id ?? (legacy ? "__legacy__" : "__none__");
+
+  return (
+    <Select
+      value={selectValue}
+      onValueChange={(v) => {
+        if (v === "__legacy__" || v === "__none__") return;
+        const m = members.find((x) => x.user_id === v);
+        if (m) onPickMember(m);
+      }}
+      disabled={disabled}
+    >
+      <SelectTrigger className={cn(className)}>
+        <SelectValue placeholder="เลือกผู้รับผิดชอบในทีม" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none__" disabled>
+          — เลือก —
+        </SelectItem>
+        {legacy ? (
+          <SelectItem value="__legacy__">
+            {trimmedOwner}
+            {" "}
+            <span className="text-muted-foreground">
+              (ไม่อยู่ในรายชื่อทีม — เลือกสมาชิกด้านล่าง)
+            </span>
+          </SelectItem>
+        ) : null}
+        {members.map((m) => (
+          <SelectItem key={m.user_id} value={m.user_id}>
+            {memberLabel(m)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}

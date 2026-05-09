@@ -21,8 +21,26 @@ import {
   setSyncHandlers,
 } from "@/lib/syncBridge";
 import type { SupabasePublicEnv } from "@/lib/supabase/config";
+import { toastSupabasePersistError } from "@/lib/supabase/persistErrors";
+import { DEMO_KEY } from "@/components/shared/SideNav";
+import { clearPlannerClientStorage } from "@/lib/clientStorage";
 
 export type PlannerRole = "viewer" | "editor" | "admin";
+const ACTIVE_WORKSPACE_KEY = "cp:active-workspace";
+
+export type WorkspaceMemberRow = {
+  user_id: string;
+  role: PlannerRole;
+  email: string | null;
+  display_name: string | null;
+};
+
+export type WorkspaceSummary = {
+  id: string;
+  name: string;
+  slug: string | null;
+  role: PlannerRole;
+};
 
 type Ctx = {
   configured: boolean;
@@ -30,7 +48,17 @@ type Ctx = {
   /** false จนกว่าจะ getSession ครั้งแรกเสร็จ — ใช้หลีกเลี่ยงพาไปหน้าแอปก่อนรู้ว่าล็อกอินหรือยัง */
   authHydrated: boolean;
   session: Session | null;
+  /** บทบาทจากตาราง profiles (fallback เมื่อยังไม่มี workspace context) */
   role: PlannerRole;
+  /** Workspace ที่ใช้ซิงค์คอนเทนต์ — null เมื่อยังไม่โหลดหรือไม่ได้ตั้งค่า Supabase */
+  workspaceId: string | null;
+  /** บทบาทในทีม workspace ปัจจุบัน */
+  workspaceRole: PlannerRole | null;
+  workspaces: WorkspaceSummary[];
+  workspaceMembers: WorkspaceMemberRow[];
+  workspaceLoading: boolean;
+  setActiveWorkspace: (workspaceId: string) => void;
+  refreshWorkspace: () => Promise<void>;
   /** เข้าเมนูหลังบ้านได้จากตาราง admin_emails (ไม่ใช้ profiles.role) */
   canAccessAdmin: boolean;
   /** ชื่อที่ใช้ในแอป (จาก profiles.display_name) */
@@ -50,6 +78,13 @@ const SupabaseAppContext = createContext<Ctx>({
   authHydrated: false,
   session: null,
   role: "editor",
+  workspaceId: null,
+  workspaceRole: null,
+  workspaces: [],
+  workspaceMembers: [],
+  workspaceLoading: false,
+  setActiveWorkspace: () => {},
+  refreshWorkspace: async () => {},
   canAccessAdmin: false,
   displayName: null,
   organizationName: "DINKR",
@@ -90,6 +125,14 @@ export function SupabaseAppProvider({
   const [reportFooterNote, setReportFooterNote] = useState("");
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [canAccessAdmin, setCanAccessAdmin] = useState(false);
+
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [workspaceRole, setWorkspaceRole] = useState<PlannerRole | null>(null);
+  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMemberRow[]>(
+    []
+  );
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -159,6 +202,160 @@ export function SupabaseAppProvider({
     setLoadingProfile(false);
   }, [supabase, session?.user]);
 
+  const refreshWorkspace = useCallback(async () => {
+    if (!supabase || !session?.user) {
+      setWorkspaceId(null);
+      setWorkspaceRole(null);
+      setWorkspaces([]);
+      setWorkspaceMembers([]);
+      setWorkspaceLoading(false);
+      return;
+    }
+    setWorkspaceLoading(true);
+    const uid = session.user.id;
+
+    const { data: membershipRows, error: mineErr } = await supabase
+      .from("workspace_members")
+      .select("workspace_id, role")
+      .eq("user_id", uid)
+      .order("joined_at", { ascending: true });
+
+    if (mineErr || !membershipRows?.length) {
+      if (mineErr) console.warn("workspace_members:", mineErr.message);
+      setWorkspaceId(null);
+      setWorkspaceRole(null);
+      setWorkspaces([]);
+      setWorkspaceMembers([]);
+      setWorkspaceLoading(false);
+      return;
+    }
+
+    const memberships = membershipRows
+      .map((r) => ({
+        workspace_id: r.workspace_id as string,
+        role: r.role as PlannerRole,
+      }))
+      .filter((r) => r.workspace_id);
+
+    const ids = memberships.map((m) => m.workspace_id);
+    const { data: wsRows, error: wsErr } = await supabase
+      .from("workspaces")
+      .select("id, name, slug")
+      .in("id", ids);
+    if (wsErr) {
+      toast.error(`โหลดรายการ workspace ล้มเหลว: ${wsErr.message}`);
+      setWorkspaceId(null);
+      setWorkspaceRole(null);
+      setWorkspaces([]);
+      setWorkspaceMembers([]);
+      setWorkspaceLoading(false);
+      return;
+    }
+
+    const wsMap = new Map(
+      (wsRows ?? []).map((w) => [
+        w.id as string,
+        {
+          name: (w.name as string) ?? "Workspace",
+          slug: (w.slug as string | null) ?? null,
+        },
+      ])
+    );
+
+    const joined: WorkspaceSummary[] = memberships
+      .map((m) => {
+        const w = wsMap.get(m.workspace_id);
+        if (!w) return null;
+        return {
+          id: m.workspace_id,
+          role:
+            m.role === "viewer" || m.role === "editor" || m.role === "admin"
+              ? m.role
+              : "editor",
+          name: w.name,
+          slug: w.slug,
+        };
+      })
+      .filter((x): x is WorkspaceSummary => Boolean(x));
+
+    setWorkspaces(joined);
+
+    const preferredId =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(ACTIVE_WORKSPACE_KEY)
+        : null;
+    const selected =
+      joined.find((w) => w.id === preferredId) ??
+      joined[0] ??
+      null;
+    const wsId = selected?.id ?? null;
+    const wr = selected?.role ?? null;
+    if (wsId && typeof window !== "undefined") {
+      window.localStorage.setItem(ACTIVE_WORKSPACE_KEY, wsId);
+    }
+    setWorkspaceId(wsId);
+    setWorkspaceRole(wr);
+
+    if (!wsId) {
+      setWorkspaceMembers([]);
+      setWorkspaceLoading(false);
+      return;
+    }
+
+    const { data: memRows, error: memErr } = await supabase
+      .from("workspace_members")
+      .select("user_id, role")
+      .eq("workspace_id", wsId);
+
+    if (memErr || !memRows?.length) {
+      if (memErr) toast.error(`โหลดสมาชิกทีมล้มเหลว: ${memErr.message}`);
+      setWorkspaceMembers([]);
+      setWorkspaceLoading(false);
+      return;
+    }
+
+    const memberIds = memRows.map((r) => r.user_id as string);
+    const { data: profs, error: pErr } = await supabase
+      .from("profiles")
+      .select("id, email, display_name")
+      .in("id", memberIds);
+
+    if (pErr) {
+      toast.error(`โหลดโปรไฟล์ทีมล้มเหลว: ${pErr.message}`);
+      setWorkspaceMembers([]);
+      setWorkspaceLoading(false);
+      return;
+    }
+
+    const pmap = new Map(
+      (profs ?? []).map((p) => [
+        p.id as string,
+        {
+          email: (p.email as string | null) ?? null,
+          display_name: (p.display_name as string | null) ?? null,
+        },
+      ])
+    );
+
+    const mapped: WorkspaceMemberRow[] = memRows.map((r) => {
+      const id = r.user_id as string;
+      const pr = pmap.get(id);
+      const mr = r.role as PlannerRole;
+      return {
+        user_id: id,
+        role:
+          mr === "viewer" || mr === "editor" || mr === "admin"
+            ? mr
+            : "editor",
+        email: pr?.email ?? null,
+        display_name: pr?.display_name ?? null,
+      };
+    });
+
+    setWorkspaceMembers(mapped);
+    setWorkspaceLoading(false);
+  }, [supabase, session?.user]);
+
   const refreshOrganizationSettings = useCallback(async () => {
     if (!supabase || !session?.user) {
       setOrganizationName("DINKR");
@@ -196,6 +393,39 @@ export function SupabaseAppProvider({
     void refreshOrganizationSettings();
   }, [refreshOrganizationSettings]);
 
+  useEffect(() => {
+    void refreshWorkspace();
+  }, [refreshWorkspace]);
+
+  const setActiveWorkspace = useCallback((nextWorkspaceId: string) => {
+    if (!nextWorkspaceId) return;
+    const match = workspaces.find((w) => w.id === nextWorkspaceId);
+    if (!match) return;
+    setWorkspaceId(match.id);
+    setWorkspaceRole(match.role);
+    setWorkspaceMembers([]);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(ACTIVE_WORKSPACE_KEY, match.id);
+    }
+    void refreshWorkspace();
+  }, [workspaces, refreshWorkspace]);
+
+  useEffect(() => {
+    if (!authHydrated || session) return;
+    clearSyncHandlers();
+    runAsRemoteApply(() => {
+      useContentStore.getState().replaceAllItems([]);
+    });
+    setWorkspaceId(null);
+    setWorkspaceRole(null);
+    setWorkspaces([]);
+    setWorkspaceMembers([]);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(ACTIVE_WORKSPACE_KEY);
+    }
+    clearPlannerClientStorage(DEMO_KEY);
+  }, [authHydrated, session]);
+
   const signOut = useCallback(async () => {
     if (!supabase) return;
     clearSyncHandlers();
@@ -203,6 +433,7 @@ export function SupabaseAppProvider({
     runAsRemoteApply(() => {
       useContentStore.getState().replaceAllItems([]);
     });
+    clearPlannerClientStorage(DEMO_KEY);
   }, [supabase]);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -210,12 +441,13 @@ export function SupabaseAppProvider({
   useEffect(() => {
     channelRef.current = null;
 
-    if (!supabase || !configured || !session?.user) {
+    if (!supabase || !configured || !session?.user || !workspaceId) {
       clearSyncHandlers();
       return;
     }
 
     const userId = session.user.id;
+    const wsId = workspaceId;
     let cancelled = false;
 
     const upsertItem = async (item: ContentItem) => {
@@ -224,12 +456,13 @@ export function SupabaseAppProvider({
         {
           post_id: item.id,
           user_id: userId,
+          workspace_id: wsId,
           payload,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "post_id" }
       );
-      if (error) toast.error(`บันทึกคลาวด์ล้มเหลว: ${error.message}`);
+      if (error) toastSupabasePersistError(error);
     };
 
     const deleteItemRow = async (id: string) => {
@@ -237,8 +470,8 @@ export function SupabaseAppProvider({
         .from("content_items")
         .delete()
         .eq("post_id", id)
-        .eq("user_id", userId);
-      if (error) toast.error(`ลบคลาวด์ล้มเหลว: ${error.message}`);
+        .eq("workspace_id", wsId);
+      if (error) toastSupabasePersistError(error);
     };
 
     const bulkUpsert = async (items: ContentItem[]) => {
@@ -254,12 +487,13 @@ export function SupabaseAppProvider({
     void (async () => {
       const { data, error } = await supabase
         .from("content_items")
-        .select("payload");
+        .select("payload")
+        .eq("workspace_id", wsId);
 
       if (cancelled) return;
 
       if (error) {
-        toast.error(`โหลดข้อมูลคลาวด์ล้มเหลว: ${error.message}`);
+        toastSupabasePersistError(error);
         return;
       }
 
@@ -273,14 +507,14 @@ export function SupabaseAppProvider({
       if (cancelled) return;
 
       const channel = supabase
-        .channel(`content_items:${userId}`)
+        .channel(`content_items:${wsId}`)
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
             table: "content_items",
-            filter: `user_id=eq.${userId}`,
+            filter: `workspace_id=eq.${wsId}`,
           },
           (payload) => {
             if (payload.eventType === "DELETE") {
@@ -313,7 +547,7 @@ export function SupabaseAppProvider({
       channelRef.current = null;
       if (ch && supabase) void supabase.removeChannel(ch);
     };
-  }, [configured, session?.user, supabase]);
+  }, [configured, session?.user, supabase, workspaceId]);
 
   const value = useMemo<Ctx>(
     () => ({
@@ -322,6 +556,13 @@ export function SupabaseAppProvider({
       authHydrated,
       session,
       role,
+      workspaceId,
+      workspaceRole,
+      workspaces,
+      workspaceMembers,
+      workspaceLoading,
+      setActiveWorkspace,
+      refreshWorkspace,
       canAccessAdmin,
       displayName,
       organizationName,
@@ -338,6 +579,13 @@ export function SupabaseAppProvider({
       authHydrated,
       session,
       role,
+      workspaceId,
+      workspaceRole,
+      workspaces,
+      workspaceMembers,
+      workspaceLoading,
+      setActiveWorkspace,
+      refreshWorkspace,
       canAccessAdmin,
       displayName,
       organizationName,

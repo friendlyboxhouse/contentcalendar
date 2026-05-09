@@ -29,6 +29,7 @@ import {
 } from "@/lib/kpi";
 import { toast } from "sonner";
 import { MaterialIcon } from "@/components/ui/material-icon";
+import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
 
 function emptyMetrics(): MetricsSnapshot {
   return {
@@ -47,6 +48,7 @@ function emptyMetrics(): MetricsSnapshot {
 export function PerformanceDetailClient({ id }: { id: string }) {
   const items = useContentStore((s) => s.items);
   const updateItem = useContentStore((s) => s.updateItem);
+  const { canEdit } = usePlannerPermissions();
 
   const base = items.find((i) => i.id === id);
 
@@ -142,7 +144,8 @@ export function PerformanceDetailClient({ id }: { id: string }) {
 
   const metricInputs = (
     m: MetricsSnapshot,
-    set: (u: MetricsSnapshot) => void
+    set: (u: MetricsSnapshot) => void,
+    editable: boolean
   ) => (
     <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {(
@@ -161,6 +164,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
           <Label className="text-xs">{lab}</Label>
           <Input
             type="number"
+            disabled={!editable}
             value={(m as never)[key] ?? ""}
             onChange={(e) => {
               const v =
@@ -183,6 +187,10 @@ export function PerformanceDetailClient({ id }: { id: string }) {
   );
 
   const save = () => {
+    if (!canEdit) {
+      toast.message("โหมดดูอย่างเดียว — ไม่สามารถบันทึกการรีวิวได้");
+      return;
+    }
     const perfBase: NonNullable<ContentItem["performance"]> =
       base.performance ?? {
         whatWorked: "",
@@ -229,7 +237,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
           </Link>
           <h1 className="text-xl font-bold">{base.id} · ผลงาน</h1>
         </div>
-        <Button size="sm" onClick={save}>
+        <Button size="sm" onClick={save} disabled={!canEdit}>
           บันทึกการรีวิว
         </Button>
       </div>
@@ -282,7 +290,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
         <CardHeader>
           <CardTitle className="text-sm">สแนปช็อต — 24 ชม.</CardTitle>
         </CardHeader>
-        <CardContent>{metricInputs(snap24, setSnap24)}</CardContent>
+        <CardContent>{metricInputs(snap24, setSnap24, canEdit)}</CardContent>
       </Card>
 
       <Card>
@@ -290,7 +298,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
           <CardTitle className="text-sm">ตัวเลขสุดท้าย — 7 วัน</CardTitle>
         </CardHeader>
         <CardContent>
-          {metricInputs(finalM, setFinalM)}
+          {metricInputs(finalM, setFinalM, canEdit)}
           <div className="mt-2 text-xs text-muted-foreground">
             Live ER {erFinal}% · Save {srFinal}% · Share {shrFinal}%
           </div>
@@ -333,8 +341,9 @@ export function PerformanceDetailClient({ id }: { id: string }) {
                   key={r}
                   type="button"
                   aria-label={`ให้คะแนน ${r} จาก 5`}
+                  disabled={!canEdit}
                   onClick={() => setRating(r)}
-                  className="rounded-sm border border-transparent p-2 hover:bg-muted max-md:min-h-11 max-md:min-w-11 max-md:p-0"
+                  className="rounded-sm border border-transparent p-2 hover:bg-muted max-md:min-h-11 max-md:min-w-11 max-md:p-0 disabled:pointer-events-none disabled:opacity-40"
                 >
                   <MaterialIcon
                     name="star"
@@ -361,6 +370,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
             <Textarea
               rows={4}
               value={whatWorked}
+              disabled={!canEdit}
               onChange={(e) => setWhatWorked(e.target.value)}
               placeholder="สิ่งที่โดนใจผู้ชม..."
             />
@@ -370,6 +380,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
             <Textarea
               rows={4}
               value={whatDidnt}
+              disabled={!canEdit}
               onChange={(e) => setWhatDidnt(e.target.value)}
               placeholder="มุมที่ควรปรับ..."
             />
@@ -379,6 +390,7 @@ export function PerformanceDetailClient({ id }: { id: string }) {
             <Textarea
               rows={4}
               value={nextAction}
+              disabled={!canEdit}
               onChange={(e) => setNextAction(e.target.value)}
               placeholder="แผนต่อยอดครั้งถัดไป..."
             />
@@ -394,7 +406,9 @@ export function PerformanceDetailClient({ id }: { id: string }) {
           >
             ปิด
           </Link>
-          <Button onClick={save}>บันทึกการรีวิว</Button>
+          <Button onClick={save} disabled={!canEdit}>
+            บันทึกการรีวิว
+          </Button>
         </div>
       </div>
     </div>

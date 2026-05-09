@@ -25,6 +25,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const DEMO_KEY = "content-planner-demo-seeded-v1";
 
@@ -63,6 +70,9 @@ export function SideNav() {
     configured,
     session,
     signOut,
+    workspaceId,
+    workspaces,
+    setActiveWorkspace,
     canAccessAdmin,
     displayName,
     organizationName,
@@ -144,6 +154,31 @@ export function SideNav() {
             );
           })}
         </nav>
+
+        {configured && session && workspaces.length > 0 ? (
+          <div className="space-y-1 max-xl:hidden max-md:hidden">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Workspace
+            </p>
+            <Select
+              value={workspaceId ?? ""}
+              onValueChange={(v) => {
+                if (v) setActiveWorkspace(v);
+              }}
+            >
+              <SelectTrigger className="h-9 w-full bg-sidebar-accent/40">
+                <SelectValue placeholder="เลือก workspace" />
+              </SelectTrigger>
+              <SelectContent>
+                {workspaces.map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name} ({w.role})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
 
         <Button
           type="button"

@@ -48,7 +48,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { MaterialIcon } from "@/components/ui/material-icon";
-import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
+import {
+  useSupabaseApp,
+} from "@/components/supabase/SupabaseAppProvider";
+import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
+import { reviveContentItems } from "@/lib/revive";
+import { toastSupabasePersistError } from "@/lib/supabase/persistErrors";
+import {
+  OwnerMemberSelect,
+  ownerStoredFromMember,
+} from "@/components/shared/OwnerMemberSelect";
+import {
+  AssetFolderLinkField,
+  ReferenceLinksField,
+} from "@/components/shared/ReferenceLinksField";
 import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { useDraftAutosave } from "@/hooks/useDraftAutosave";
@@ -97,8 +110,14 @@ export function BriefDetailClient({ briefId }: Props) {
   const addItem = useContentStore((s) => s.addItem);
   const updateItem = useContentStore((s) => s.updateItem);
   const updateStatus = useContentStore((s) => s.updateStatus);
-  const { role } = useSupabaseApp();
-  const canEdit = role !== "viewer";
+  const {
+    supabase,
+    workspaceId,
+    workspaceMembers,
+    workspaceLoading,
+    session,
+  } = useSupabaseApp();
+  const { canEdit } = usePlannerPermissions();
 
   const isNew = !briefId;
   const seedNewRef = useRef<ContentItem | null>(null);
@@ -109,6 +128,14 @@ export function BriefDetailClient({ briefId }: Props) {
   const existing = briefId
     ? items.find((i) => i.id === briefId)
     : undefined;
+
+  useEffect(() => {
+    if (!isNew || workspaceLoading) return;
+    if (!canEdit) {
+      toast.message("ไม่มีสิทธิ์สร้างบรีฟใหม่");
+      router.replace("/briefs");
+    }
+  }, [isNew, canEdit, workspaceLoading, router]);
 
   const [draft, setDraft] = useState<ContentItem | null>(null);
   const [revNote, setRevNote] = useState("");
@@ -145,12 +172,94 @@ export function BriefDetailClient({ briefId }: Props) {
 
   // Auto-save unsaved edits to localStorage every 1s for resilience.
   const autosaveKey = isNew ? "brief-new" : `brief-${briefId ?? ""}`;
-  const { savedAt, hasUnsaved, clearDraft } = useDraftAutosave({
+  const { savedAt, hasUnsaved, clearDraft, loadDraft } = useDraftAutosave({
     key: autosaveKey,
     value: draft,
     debounceMs: 1000,
     disabled: !canEdit,
   });
+
+  const draftHydratedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const routeKey = `${isNew ? "new" : briefId}:${workspaceId ?? "offline"}`;
+    if (draftHydratedRef.current === routeKey) return;
+
+    const loc = loadDraft();
+    const locTs = loc?.ts ?? 0;
+    let best: ContentItem | null =
+      loc?.value != null ? mergeBriefDraft(loc.value as ContentItem) : null;
+    const localDraftTs = loc?.value != null ? locTs : -1;
+
+    if (!supabase || !workspaceId || !session?.user) {
+      if (best) setDraft(best);
+      draftHydratedRef.current = routeKey;
+      return;
+    }
+
+    draftHydratedRef.current = routeKey;
+
+    const bk = isNew ? "new" : briefId!;
+    let cancelled = false;
+
+    void (async () => {
+      const { data, error } = await supabase
+        .from("brief_drafts")
+        .select("payload, updated_at")
+        .eq("workspace_id", workspaceId)
+        .eq("user_id", session.user.id)
+        .eq("brief_key", bk)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (!error && data?.payload) {
+        const cloudTs = new Date(data.updated_at as string).getTime();
+        if (cloudTs > localDraftTs) {
+          best = mergeBriefDraft(
+            reviveContentItems([data.payload as ContentItem])[0]
+          );
+        }
+      }
+
+      if (best) setDraft(best);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (draftHydratedRef.current === routeKey) draftHydratedRef.current = null;
+    };
+  }, [briefId, isNew, workspaceId, supabase, session?.user, loadDraft]);
+
+  useEffect(() => {
+    if (!canEdit || !supabase || !workspaceId || !session?.user || draft == null)
+      return;
+
+    const briefKey = isNew ? "new" : briefId!;
+    const handle = window.setTimeout(() => {
+      const payload = JSON.parse(JSON.stringify(draft)) as Record<
+        string,
+        unknown
+      >;
+      void supabase
+        .from("brief_drafts")
+        .upsert(
+          {
+            workspace_id: workspaceId,
+            user_id: session.user.id,
+            brief_key: briefKey,
+            payload,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "workspace_id,user_id,brief_key" }
+        )
+        .then(({ error }) => {
+          if (error) toastSupabasePersistError(error);
+        });
+    }, 1800);
+
+    return () => window.clearTimeout(handle);
+  }, [draft, canEdit, workspaceId, supabase, session?.user, isNew, briefId]);
 
   const syncDeadlines = (publish: Date, preset: SLAPresetKey, fmt: ContentFormat) => {
     const key = preset ?? resolveSLAKey(fmt);
@@ -293,6 +402,19 @@ export function BriefDetailClient({ briefId }: Props) {
       donts: draft.donts.filter((x) => x.trim()),
       updatedAt: new Date(),
     };
+    const cloudKey = isNew ? "new" : cleaned.id;
+    if (supabase && workspaceId && session?.user) {
+      void supabase
+        .from("brief_drafts")
+        .delete()
+        .eq("workspace_id", workspaceId)
+        .eq("user_id", session.user.id)
+        .eq("brief_key", cloudKey)
+        .then(({ error }) => {
+          if (error) toastSupabasePersistError(error);
+        });
+    }
+
     if (isNew) {
       addItem(cleaned);
       clearDraft();
@@ -442,15 +564,20 @@ export function BriefDetailClient({ briefId }: Props) {
           <CardContent className="grid gap-3">
             <div>
               <Label>Owner</Label>
-              <Input
-                value={draft.owner}
-                onChange={(e) => setField("owner", e.target.value)}
+              <OwnerMemberSelect
+                members={workspaceMembers}
+                ownerDisplay={draft.owner}
+                disabled={!canEdit}
+                onPickMember={(m) =>
+                  setField("owner", ownerStoredFromMember(m))
+                }
               />
             </div>
             <div>
               <Label>Pillar</Label>
               <Select
                 value={draft.pillar}
+                disabled={!canEdit}
                 onValueChange={(v) => setField("pillar", v as ContentPillar)}
               >
                 <SelectTrigger>
@@ -469,6 +596,7 @@ export function BriefDetailClient({ briefId }: Props) {
               <Label>Format</Label>
               <Select
                 value={draft.format}
+                disabled={!canEdit}
                 onValueChange={(v) => {
                   const f = v as ContentFormat;
                   setField("format", f);
@@ -493,6 +621,7 @@ export function BriefDetailClient({ briefId }: Props) {
               <Label>Content type</Label>
               <Select
                 value={draft.contentType}
+                disabled={!canEdit}
                 onValueChange={(v) => setField("contentType", v as ContentType)}
               >
                 <SelectTrigger>
@@ -519,6 +648,7 @@ export function BriefDetailClient({ briefId }: Props) {
               <Label>Funnel</Label>
               <Select
                 value={draft.funnelStage}
+                disabled={!canEdit}
                 onValueChange={(v) => setField("funnelStage", v as FunnelStage)}
               >
                 <SelectTrigger>
@@ -537,6 +667,7 @@ export function BriefDetailClient({ briefId }: Props) {
               <Label>Campaign (optional)</Label>
               <Input
                 value={draft.campaign ?? ""}
+                disabled={!canEdit}
                 onChange={(e) => setField("campaign", e.target.value)}
               />
             </div>
@@ -549,6 +680,7 @@ export function BriefDetailClient({ briefId }: Props) {
                   <label key={p} className="flex items-center gap-2 text-sm">
                     <Checkbox
                       checked={draft.platform.includes(p)}
+                      disabled={!canEdit}
                       onCheckedChange={(c) => {
                         const on = Boolean(c);
                         setField(
@@ -578,6 +710,7 @@ export function BriefDetailClient({ briefId }: Props) {
                 <Input
                   type="date"
                   value={dateStr(draft.publishDate)}
+                  disabled={!canEdit}
                   onChange={(e) => {
                     const next = new Date(e.target.value + "T12:00:00");
                     const preset =
@@ -591,6 +724,7 @@ export function BriefDetailClient({ briefId }: Props) {
                 <Input
                   type="time"
                   value={draft.publishTime ?? ""}
+                  disabled={!canEdit}
                   onChange={(e) => setField("publishTime", e.target.value)}
                 />
               </div>
@@ -598,6 +732,7 @@ export function BriefDetailClient({ briefId }: Props) {
             <SLAPresetPicker
               publishDate={new Date(draft.publishDate)}
               selectedPreset={slaPreset}
+              disabled={!canEdit}
               onPresetChange={(preset) => {
                 const dl = calculateDeadlines(
                   new Date(draft.publishDate),
@@ -640,29 +775,43 @@ export function BriefDetailClient({ briefId }: Props) {
         <CardContent className="grid gap-3">
           <div>
             <Label>Topic *</Label>
-            <Input value={draft.topic} onChange={(e) => setField("topic", e.target.value)} />
+            <Input
+              value={draft.topic}
+              disabled={!canEdit}
+              onChange={(e) => setField("topic", e.target.value)}
+            />
           </div>
           <div>
             <Label>Angle</Label>
-            <Input value={draft.angle} onChange={(e) => setField("angle", e.target.value)} />
+            <Input
+              value={draft.angle}
+              disabled={!canEdit}
+              onChange={(e) => setField("angle", e.target.value)}
+            />
           </div>
           <div>
             <Label>Target audience</Label>
             <Textarea
               rows={2}
               value={draft.targetAudience}
+              disabled={!canEdit}
               onChange={(e) => setField("targetAudience", e.target.value)}
             />
           </div>
           <div>
             <Label>Hook</Label>
-            <Input value={draft.hook} onChange={(e) => setField("hook", e.target.value)} />
+            <Input
+              value={draft.hook}
+              disabled={!canEdit}
+              onChange={(e) => setField("hook", e.target.value)}
+            />
           </div>
           <div>
             <Label>Caption direction</Label>
             <Textarea
               rows={4}
               value={draft.captionDirection}
+              disabled={!canEdit}
               onChange={(e) => setField("captionDirection", e.target.value)}
             />
           </div>
@@ -671,18 +820,24 @@ export function BriefDetailClient({ briefId }: Props) {
             <Textarea
               rows={4}
               value={draft.visualDirection}
+              disabled={!canEdit}
               onChange={(e) => setField("visualDirection", e.target.value)}
             />
           </div>
           <div>
             <Label>CTA</Label>
-            <Input value={draft.cta} onChange={(e) => setField("cta", e.target.value)} />
+            <Input
+              value={draft.cta}
+              disabled={!canEdit}
+              onChange={(e) => setField("cta", e.target.value)}
+            />
           </div>
           <div>
             <Label>Strategic notes</Label>
             <Textarea
               rows={2}
               value={draft.strategicNotes}
+              disabled={!canEdit}
               onChange={(e) => setField("strategicNotes", e.target.value)}
             />
           </div>
@@ -697,6 +852,7 @@ export function BriefDetailClient({ briefId }: Props) {
               type="button"
               variant="outline"
               size="sm"
+              disabled={!canEdit}
               onClick={() => setField("dos", [...draft.dos, ""])}
             >
               + Add
@@ -707,6 +863,7 @@ export function BriefDetailClient({ briefId }: Props) {
               <Input
                 key={i}
                 value={line}
+                disabled={!canEdit}
                 onChange={(e) => {
                   const next = [...draft.dos];
                   next[i] = e.target.value;
@@ -723,6 +880,7 @@ export function BriefDetailClient({ briefId }: Props) {
               type="button"
               variant="outline"
               size="sm"
+              disabled={!canEdit}
               onClick={() => setField("donts", [...draft.donts, ""])}
             >
               + Add
@@ -733,6 +891,7 @@ export function BriefDetailClient({ briefId }: Props) {
               <Input
                 key={i}
                 value={line}
+                disabled={!canEdit}
                 onChange={(e) => {
                   const next = [...draft.donts];
                   next[i] = e.target.value;
@@ -751,37 +910,29 @@ export function BriefDetailClient({ briefId }: Props) {
         <CardContent className="space-y-3">
           <div className="flex justify-between gap-2">
             <Label className="flex-1">Reference links</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setField("referenceLinks", [...draft.referenceLinks, ""])
-              }
-            >
-              + Link
-            </Button>
+            {canEdit ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setField("referenceLinks", [...draft.referenceLinks, ""])
+                }
+              >
+                + Link
+              </Button>
+            ) : null}
           </div>
-          {draft.referenceLinks.map((url, i) => (
-            <Input
-              key={i}
-              placeholder="https://"
-              value={url}
-              onChange={(e) => {
-                const next = [...draft.referenceLinks];
-                next[i] = e.target.value;
-                setField("referenceLinks", next);
-              }}
-            />
-          ))}
-          <div>
-            <Label>Asset folder link</Label>
-            <Input
-              placeholder="Drive / Dropbox URL"
-              value={draft.assetFolderLink ?? ""}
-              onChange={(e) => setField("assetFolderLink", e.target.value)}
-            />
-          </div>
+          <ReferenceLinksField
+            links={draft.referenceLinks}
+            canEdit={canEdit}
+            onChange={(next) => setField("referenceLinks", next)}
+          />
+          <AssetFolderLinkField
+            value={draft.assetFolderLink ?? ""}
+            canEdit={canEdit}
+            onChange={(v) => setField("assetFolderLink", v)}
+          />
         </CardContent>
       </Card>
 
@@ -915,6 +1066,7 @@ export function BriefDetailClient({ briefId }: Props) {
                 <Input
                   type="number"
                   value={draft.kpiTargets[key] ?? ""}
+                  disabled={!canEdit}
                   onChange={(e) => {
                     const n = e.target.value === "" ? undefined : Number(e.target.value);
                     setField("kpiTargets", { ...draft.kpiTargets, [key]: n });

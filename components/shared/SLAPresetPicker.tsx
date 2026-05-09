@@ -19,6 +19,7 @@ interface SLAPresetPickerProps {
   onDeadlinesCalculated?: (
     deadlines: ReturnType<typeof calculateDeadlines>
   ) => void;
+  disabled?: boolean;
 }
 
 export function SLAPresetPicker({
@@ -26,6 +27,7 @@ export function SLAPresetPicker({
   selectedPreset,
   onPresetChange,
   onDeadlinesCalculated,
+  disabled = false,
 }: SLAPresetPickerProps) {
   const sla = SLA_PRESETS[selectedPreset];
   const deadlines = calculateDeadlines(publishDate, selectedPreset);
@@ -39,7 +41,11 @@ export function SLAPresetPicker({
 
   return (
     <div className="space-y-3">
-      <Select value={selectedPreset} onValueChange={handleChange}>
+      <Select
+        value={selectedPreset}
+        onValueChange={handleChange}
+        disabled={disabled}
+      >
         <SelectTrigger className="w-full">
           <SelectValue placeholder="เลือก SLA Preset" />
         </SelectTrigger>

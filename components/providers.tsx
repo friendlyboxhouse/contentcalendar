@@ -9,6 +9,7 @@ import { CommandPaletteGate } from "@/components/command-palette-gate";
 import { DEMO_KEY } from "@/components/shared/SideNav";
 import { SupabaseAppProvider } from "@/components/supabase/SupabaseAppProvider";
 import type { SupabasePublicEnv } from "@/lib/supabase/config";
+import { isLocalhostHost } from "@/lib/clientStorage";
 
 export function Providers({
   children,
@@ -27,6 +28,8 @@ export function Providers({
     const maybeSeed = () => {
       try {
         if (cloudAuth) return;
+        if (typeof window === "undefined") return;
+        if (!isLocalhostHost(window.location.hostname)) return;
         const done = localStorage.getItem(DEMO_KEY);
         const { items, seedFromDemo } = useContentStore.getState();
         if (!done && items.length === 0) {

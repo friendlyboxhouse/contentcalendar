@@ -16,11 +16,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import {
   useSupabaseApp,
   type PlannerRole,
 } from "@/components/supabase/SupabaseAppProvider";
+import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
 import { cn } from "@/lib/utils";
 const ROLE_HELP: Record<PlannerRole, { title: string; body: string }> = {
   viewer: {
@@ -42,6 +50,13 @@ export function SettingsPageClient() {
     supabase,
     session,
     role,
+    workspaceId,
+    workspaceRole,
+    workspaces,
+    workspaceMembers,
+    workspaceLoading,
+    setActiveWorkspace,
+    refreshWorkspace,
     canAccessAdmin,
     displayName,
     organizationName,
@@ -51,6 +66,8 @@ export function SettingsPageClient() {
     refreshOrganizationSettings,
     signOut,
   } = useSupabaseApp();
+
+  const { isWorkspaceAdmin } = usePlannerPermissions();
 
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -63,6 +80,13 @@ export function SettingsPageClient() {
   const [reportNoteDraft, setReportNoteDraft] = useState("");
   const [savingOrg, setSavingOrg] = useState(false);
 
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<PlannerRole>("viewer");
+  const [inviting, setInviting] = useState(false);
+  const [memberActionBusy, setMemberActionBusy] = useState<string | null>(null);
+  const [mergeSourceWorkspace, setMergeSourceWorkspace] = useState<string>("");
+  const [mergingWorkspace, setMergingWorkspace] = useState(false);
+
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -73,6 +97,10 @@ export function SettingsPageClient() {
     setOrgNameDraft(organizationName);
     setTaglineDraft(organizationTagline);
   }, [organizationName, organizationTagline]);
+
+  useEffect(() => {
+    setMergeSourceWorkspace("");
+  }, [workspaceId]);
 
   useEffect(() => {
     if (!supabase || !session?.user || !canAccessAdmin) return;
@@ -142,6 +170,91 @@ export function SettingsPageClient() {
 
   const rh = ROLE_HELP[role];
 
+  const inviteMember = async () => {
+    if (!supabase || !workspaceId || !inviteEmail.trim()) return;
+    setInviting(true);
+    const { error } = await supabase.rpc("invite_to_workspace", {
+      p_workspace: workspaceId,
+      p_email: inviteEmail.trim(),
+      p_role: inviteRole,
+    });
+    setInviting(false);
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes("email_not_registered")) {
+        toast.error(
+          "ไม่พบอีเมลนี้ในระบบ — ผู้ถูกเชิญต้องล็อกอินครั้งแรกให้มีโปรไฟล์ก่อน"
+        );
+      } else if (msg.includes("invite denied")) {
+        toast.error("คุณไม่ใช่แอดมินของทีม workspace นี้");
+      } else {
+        toast.error(error.message);
+      }
+      return;
+    }
+    toast.success("เชิญสมาชิกเข้าทีมแล้ว");
+    setInviteEmail("");
+    await refreshWorkspace();
+  };
+
+  const updateMemberRole = async (memberUserId: string, nextRole: PlannerRole) => {
+    if (!supabase || !workspaceId) return;
+    setMemberActionBusy(`role:${memberUserId}`);
+    const { error } = await supabase
+      .from("workspace_members")
+      .update({ role: nextRole })
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", memberUserId);
+    setMemberActionBusy(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("อัปเดตบทบาทสมาชิกแล้ว");
+    await refreshWorkspace();
+  };
+
+  const removeMember = async (memberUserId: string) => {
+    if (!supabase || !workspaceId) return;
+    const me = session?.user?.id;
+    if (memberUserId === me) {
+      toast.error("ยังไม่รองรับการลบตัวเองออกจากทีมในหน้านี้");
+      return;
+    }
+    setMemberActionBusy(`remove:${memberUserId}`);
+    const { error } = await supabase
+      .from("workspace_members")
+      .delete()
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", memberUserId);
+    setMemberActionBusy(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("ลบสมาชิกออกจากทีมแล้ว");
+    await refreshWorkspace();
+  };
+
+  const mergeWorkspaceIntoCurrent = async () => {
+    if (!supabase || !workspaceId || !mergeSourceWorkspace) return;
+    if (mergeSourceWorkspace === workspaceId) return;
+    setMergingWorkspace(true);
+    const { data, error } = await supabase.rpc("merge_workspace_content", {
+      p_source_workspace: mergeSourceWorkspace,
+      p_target_workspace: workspaceId,
+    });
+    setMergingWorkspace(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const moved = Number(data ?? 0);
+    toast.success(`ย้ายคอนเทนต์ ${moved} รายการเข้า workspace ปัจจุบันแล้ว`);
+    setMergeSourceWorkspace("");
+    await refreshWorkspace();
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-10">
       <div>
@@ -161,6 +274,7 @@ export function SettingsPageClient() {
           <TabsTrigger value="profile">โปรไฟล์</TabsTrigger>
           <TabsTrigger value="project">โปรเจกต์</TabsTrigger>
           <TabsTrigger value="access">การเข้าถึง</TabsTrigger>
+          <TabsTrigger value="workspace">ทีม Workspace</TabsTrigger>
           <TabsTrigger value="appearance">รูปลักษณ์</TabsTrigger>
           <TabsTrigger value="about">เกี่ยวกับ</TabsTrigger>
         </TabsList>
@@ -190,10 +304,16 @@ export function SettingsPageClient() {
               </div>
               <div className="rounded-lg border bg-muted/30 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  บทบาทในระบบ
+                  บทบาทในระบบ (profiles)
                 </p>
                 <p className="mt-1 font-medium capitalize">{role}</p>
                 <p className="mt-2 text-sm text-muted-foreground">{rh.body}</p>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  บทบาทใน workspace (ซิงค์คอนเทนต์)
+                </p>
+                <p className="mt-1 font-medium capitalize">
+                  {workspaceRole ?? (workspaceLoading ? "กำลังโหลด…" : "—")}
+                </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -326,6 +446,219 @@ export function SettingsPageClient() {
                 <p className="rounded-md bg-muted/50 px-3 py-2 text-muted-foreground">
                   ต้องการเพิ่มเมลหรือเปลี่ยนสิทธิ์ — ติดต่อผู้ดูแลที่อยู่ในรายการแอดมินหลังบ้าน
                 </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="workspace" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">ทีม Workspace</CardTitle>
+              <CardDescription>
+                คอนเทนต์และปฏิทินซิงค์ตาม workspace เดียวกัน — สิทธิ์ viewer / editor /
+                admin ควบคุมที่ระดับสมาชิกทีมนี้
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!session?.user ? (
+                <p className="text-sm text-muted-foreground">
+                  ล็อกอินเพื่อดูสมาชิกและเชิญทีม
+                </p>
+              ) : workspaceLoading ? (
+                <p className="text-sm text-muted-foreground">กำลังโหลดทีม…</p>
+              ) : !workspaceId ? (
+                <p className="text-sm text-muted-foreground">
+                  ยังไม่พบ workspace — ตรวจสอบว่าได้รัน migration 008 (workspaces)
+                  ใน Supabase แล้วหรือไม่
+                </p>
+              ) : (
+                <>
+                  {workspaces.length > 1 ? (
+                    <div className="space-y-2">
+                      <Label>Workspace ที่กำลังใช้งาน</Label>
+                      <Select
+                        value={workspaceId}
+                        onValueChange={(v) => {
+                          if (v) setActiveWorkspace(v);
+                        }}
+                      >
+                        <SelectTrigger className="w-full sm:max-w-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {workspaces.map((w) => (
+                            <SelectItem key={w.id} value={w.id}>
+                              {w.name} ({w.role})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+                  {isWorkspaceAdmin ? (
+                    <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                      <p className="text-sm font-medium">เชิญสมาชิกด้วยอีเมล</p>
+                      <p className="text-xs text-muted-foreground">
+                        ผู้ถูกเชิญต้องล็อกอินแอปอย่างน้อยหนึ่งครั้งเพื่อให้มีแถวใน
+                        profiles — จากนั้นจึงเชิญด้วยอีเมลที่ตรงกับโปรไฟล์
+                      </p>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                        <div className="flex-1 space-y-2">
+                          <Label htmlFor="invite-email">อีเมล</Label>
+                          <Input
+                            id="invite-email"
+                            type="email"
+                            placeholder="colleague@company.com"
+                            value={inviteEmail}
+                            onChange={(e) => setInviteEmail(e.target.value)}
+                          />
+                        </div>
+                        <div className="w-full space-y-2 sm:w-40">
+                          <Label>บทบาทในทีม</Label>
+                          <Select
+                            value={inviteRole}
+                            onValueChange={(v) =>
+                              setInviteRole(v as PlannerRole)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="viewer">viewer</SelectItem>
+                              <SelectItem value="editor">editor</SelectItem>
+                              <SelectItem value="admin">admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          type="button"
+                          className="sm:mb-0.5"
+                          disabled={inviting || !inviteEmail.trim()}
+                          onClick={() => void inviteMember()}
+                        >
+                          {inviting ? "กำลังเชิญ…" : "เชิญ"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      เฉพาะแอดมินของ workspace เท่านั้นที่เชิญสมาชิกได้ — ติดต่อแอดมินทีมของคุณ
+                    </p>
+                  )}
+                  {isWorkspaceAdmin && workspaces.length > 1 ? (
+                    <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                      <p className="text-sm font-medium">
+                        ย้ายคอนเทนต์จาก workspace อื่นเข้า workspace ปัจจุบัน
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        ใช้สำหรับรวมข้อมูลที่กระจายอยู่ใน personal workspace หลังเปิดใช้
+                        multi-tenant ครั้งแรก
+                      </p>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                        <div className="flex-1 space-y-2">
+                          <Label>Workspace ต้นทาง</Label>
+                          <Select
+                            value={mergeSourceWorkspace}
+                            onValueChange={(v) =>
+                              setMergeSourceWorkspace(v ?? "")
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="เลือก workspace ต้นทาง" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {workspaces
+                                .filter((w) => w.id !== workspaceId)
+                                .map((w) => (
+                                  <SelectItem key={w.id} value={w.id}>
+                                    {w.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={mergingWorkspace || !mergeSourceWorkspace}
+                          onClick={() => void mergeWorkspaceIntoCurrent()}
+                        >
+                          {mergingWorkspace ? "กำลังย้าย…" : "ย้ายคอนเทนต์"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div>
+                    <p className="mb-2 text-sm font-medium">
+                      สมาชิกปัจจุบัน ({workspaceMembers.length})
+                    </p>
+                    <ul className="divide-y rounded-lg border text-sm">
+                      {workspaceMembers.map((m) => (
+                        <li
+                          key={m.user_id}
+                          className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                        >
+                          <span>
+                            {m.display_name?.trim() ||
+                              m.email?.trim() ||
+                              m.user_id.slice(0, 8) + "…"}
+                            {m.email ? (
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                {m.email}
+                              </span>
+                            ) : null}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {isWorkspaceAdmin ? (
+                              <Select
+                                value={m.role}
+                                onValueChange={(v) =>
+                                  void updateMemberRole(
+                                    m.user_id,
+                                    v as PlannerRole
+                                  )
+                                }
+                                disabled={
+                                  memberActionBusy === `role:${m.user_id}`
+                                }
+                              >
+                                <SelectTrigger className="h-8 w-28">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="viewer">viewer</SelectItem>
+                                  <SelectItem value="editor">editor</SelectItem>
+                                  <SelectItem value="admin">admin</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="rounded-md bg-muted px-2 py-0.5 text-xs capitalize">
+                                {m.role}
+                              </span>
+                            )}
+                            {isWorkspaceAdmin ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 px-2 text-destructive hover:text-destructive"
+                                disabled={
+                                  memberActionBusy === `remove:${m.user_id}` ||
+                                  m.user_id === session?.user?.id
+                                }
+                                onClick={() => void removeMember(m.user_id)}
+                              >
+                                <MaterialIcon name="person_remove" size={16} />
+                              </Button>
+                            ) : null}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

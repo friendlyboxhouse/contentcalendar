@@ -21,6 +21,7 @@ import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
 import { cn } from "@/lib/utils";
+import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 
 function nearestDeadline(item: ContentItem): { label: string; date: Date } {
   const candidates: { label: string; date: Date }[] = [
@@ -37,6 +38,7 @@ function nearestDeadline(item: ContentItem): { label: string; date: Date } {
 
 export function DashboardClient() {
   const router = useRouter();
+  const { configured, authHydrated, session } = useSupabaseApp();
   const hydrated = useContentStoreHydrated();
   const items = useContentStore((s) => s.items);
   const getKPIReminderItems = useContentStore((s) => s.getKPIReminderItems);
@@ -106,10 +108,10 @@ export function DashboardClient() {
     router.push(`/briefs?fs=${encodeURIComponent(fs)}`);
   };
 
-  if (!hydrated) {
+  if (!authHydrated || (configured && !session) || !hydrated) {
     return (
       <div className="min-h-[min(60vh,420px)] py-8">
-        <PageSpinner label="กำลังโหลดข้อมูลแผนงาน…" />
+        <PageSpinner label="กำลังตรวจสอบสิทธิ์และโหลดข้อมูล…" />
       </div>
     );
   }

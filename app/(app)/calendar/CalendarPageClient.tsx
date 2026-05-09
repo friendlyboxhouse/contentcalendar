@@ -33,6 +33,7 @@ import { MaterialIcon } from "@/components/ui/material-icon";
 import { PageSpinner } from "@/components/ui/feedback/PageSpinner";
 import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
+import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
 
 export function CalendarPageClient() {
   const hydrated = useContentStoreHydrated();
@@ -48,6 +49,8 @@ export function CalendarPageClient() {
     status: "all",
     format: "all",
   });
+
+  const { canDragCalendar, canChangeStatus, canDelete } = usePlannerPermissions();
 
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
@@ -99,7 +102,8 @@ export function CalendarPageClient() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">ปฏิทินคอนเทนต์</h1>
           <p className="text-sm text-muted-foreground">
-            ดูแผนตามวันโพสต์ · ลากย้ายวันได้ (มุมมองปฏิทิน)
+            ดูแผนตามวันโพสต์
+            {canDragCalendar ? " · ลากย้ายวันได้ (มุมมองปฏิทิน)" : " · โหมดดูอย่างเดียวไม่สามารถลากหรือแก้ในตารางได้"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 max-md:hidden">
@@ -141,7 +145,7 @@ export function CalendarPageClient() {
           month={month}
           onMonthChange={setMonth}
           onOpenChip={setSelected}
-          draggable
+          draggable={canDragCalendar}
         />
       ) : (
         <div className="rounded-xl border bg-card shadow-sm">
@@ -186,7 +190,7 @@ export function CalendarPageClient() {
                   <TableCell>
                     <StatusBadge
                       status={item.status}
-                      editable
+                      editable={canChangeStatus}
                       onChange={(st) => {
                         updateStatus(item.id, st);
                         toast.success(`อัปเดตเป็น ${st}`);
@@ -226,6 +230,7 @@ export function CalendarPageClient() {
                         variant="ghost"
                         size="icon"
                         aria-label={`ลบ ${item.id}`}
+                        disabled={!canDelete}
                         className="max-md:min-h-11 max-md:min-w-11"
                         onClick={() => {
                           deleteItem(item.id);
@@ -298,7 +303,7 @@ export function CalendarPageClient() {
                 </p>
                 <StatusBadge
                   status={selected.status}
-                  editable
+                  editable={canChangeStatus}
                   onChange={(st) => {
                     updateStatus(selected.id, st);
                     toast.success(`อัปเดตสถานะ`);

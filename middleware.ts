@@ -21,6 +21,11 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/auth");
 
+  const withNoStore = (res: NextResponse) => {
+    res.headers.set("Cache-Control", "no-store, must-revalidate");
+    return res;
+  };
+
   /**
    * ไม่มี Supabase env:
    * — redirect ทุกเส้นทางที่ไม่ใช่ login/auth ไป `/login` (รวมโดเมนโปรดักชัน)
@@ -31,20 +36,20 @@ export async function middleware(request: NextRequest) {
       const loginUrl = buildSafeRedirectUrl(request, "/login");
       if (loginUrl) {
         loginUrl.searchParams.set("next", nextParam || "/");
-        return NextResponse.redirect(loginUrl);
+        return withNoStore(NextResponse.redirect(loginUrl));
       }
       const nu = request.nextUrl.clone();
       nu.pathname = "/login";
       nu.searchParams.set("next", nextParam || "/");
-      return NextResponse.redirect(nu);
+      return withNoStore(NextResponse.redirect(nu));
     }
-    return NextResponse.next();
+    return withNoStore(NextResponse.next());
   }
 
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();
   if (!url || !key) {
-    return NextResponse.next();
+    return withNoStore(NextResponse.next());
   }
 
   const invokePath = `${pathname}${request.nextUrl.search}`;
@@ -91,8 +96,8 @@ export async function middleware(request: NextRequest) {
 
     if (!user && isAccessBlockedRoute) {
       const loginUrl = buildSafeRedirectUrl(request, "/login");
-      if (loginUrl) return NextResponse.redirect(loginUrl);
-      return NextResponse.redirect(new URL("/login", request.url));
+      if (loginUrl) return withNoStore(NextResponse.redirect(loginUrl));
+      return withNoStore(NextResponse.redirect(new URL("/login", request.url)));
     }
 
     if (user) {
@@ -104,16 +109,16 @@ export async function middleware(request: NextRequest) {
             request,
             `/access-blocked?reason=${encodeURIComponent(reason)}`
           );
-          if (blocked) return NextResponse.redirect(blocked);
+          if (blocked) return withNoStore(NextResponse.redirect(blocked));
           const fb = request.nextUrl.clone();
           fb.pathname = "/access-blocked";
           fb.searchParams.set("reason", reason);
-          return NextResponse.redirect(fb);
+          return withNoStore(NextResponse.redirect(fb));
         }
       } else if (isAccessBlockedRoute) {
         const home = buildSafeRedirectUrl(request, "/");
-        if (home) return NextResponse.redirect(home);
-        return NextResponse.redirect(new URL("/", request.url));
+        if (home) return withNoStore(NextResponse.redirect(home));
+        return withNoStore(NextResponse.redirect(new URL("/", request.url)));
       }
     }
 
@@ -121,18 +126,18 @@ export async function middleware(request: NextRequest) {
       const loginUrl = buildSafeRedirectUrl(request, "/login");
       if (loginUrl) {
         loginUrl.searchParams.set("next", nextParam || "/");
-        return NextResponse.redirect(loginUrl);
+        return withNoStore(NextResponse.redirect(loginUrl));
       }
       const nextUrl = request.nextUrl.clone();
       nextUrl.pathname = "/login";
       nextUrl.searchParams.set("next", nextParam || "/");
-      return NextResponse.redirect(nextUrl);
+      return withNoStore(NextResponse.redirect(nextUrl));
     }
 
     if (user && pathname === "/login") {
       const home = buildSafeRedirectUrl(request, "/");
-      if (home) return NextResponse.redirect(home);
-      return NextResponse.redirect(new URL("/", request.url));
+      if (home) return withNoStore(NextResponse.redirect(home));
+      return withNoStore(NextResponse.redirect(new URL("/", request.url)));
     }
 
     if (user && pathname.startsWith("/admin")) {
@@ -140,20 +145,20 @@ export async function middleware(request: NextRequest) {
         await supabase.rpc("is_admin_email");
       if (adminRpcErr || !portalAdmin) {
         const home = buildSafeRedirectUrl(request, "/");
-        if (home) return NextResponse.redirect(home);
-        return NextResponse.redirect(new URL("/", request.url));
+        if (home) return withNoStore(NextResponse.redirect(home));
+        return withNoStore(NextResponse.redirect(new URL("/", request.url)));
       }
     }
 
-    return supabaseResponse;
+    return withNoStore(supabaseResponse);
   } catch (e) {
     console.error("[middleware] auth:", e);
     if (pathname.startsWith("/login") || pathname.startsWith("/auth")) {
-      return NextResponse.next();
+      return withNoStore(NextResponse.next());
     }
     const loginUrl = buildSafeRedirectUrl(request, "/login");
-    if (loginUrl) return NextResponse.redirect(loginUrl);
-    return NextResponse.redirect(new URL("/login", request.url));
+    if (loginUrl) return withNoStore(NextResponse.redirect(loginUrl));
+    return withNoStore(NextResponse.redirect(new URL("/login", request.url)));
   }
 }
 

@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
 
 function getNearestDeadline(item: ContentItem): { label: string; date: Date } | null {
   const now = Date.now();
@@ -70,6 +71,8 @@ function BriefsInner() {
     if (!fsParam) return null;
     return fsParam.split(",").filter(Boolean) as ContentStatus[];
   }, [fsParam]);
+
+  const { canEdit, canChangeStatus, canDelete } = usePlannerPermissions();
 
   const owners = useMemo(() => {
     const set = new Set(items.map((i) => i.owner).filter(Boolean));
@@ -153,12 +156,14 @@ function BriefsInner() {
             ศูนย์กลางบรีฟ · เชื่อมกับปฏิทินอัตโนมัติ
           </p>
         </div>
-        <Link href="/briefs/new">
-          <Button size="sm" className="gap-1.5">
-            <MaterialIcon name="add" size={16} />
-            สร้างบรีฟใหม่
-          </Button>
-        </Link>
+        {canEdit ? (
+          <Link href="/briefs/new">
+            <Button size="sm" className="gap-1.5">
+              <MaterialIcon name="add" size={16} />
+              สร้างบรีฟใหม่
+            </Button>
+          </Link>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -210,7 +215,7 @@ function BriefsInner() {
                     >
                       <StatusBadge
                         status={item.status}
-                        editable
+                        editable={canChangeStatus}
                         onChange={(st) => {
                           updateStatus(item.id, st);
                           toast.success("อัปเดตสถานะ");
@@ -242,6 +247,7 @@ function BriefsInner() {
                     variant="ghost"
                     size="icon-sm"
                     className="max-md:min-h-10 max-md:min-w-10"
+                    disabled={!canEdit}
                     aria-label={`คัดลอกบรีฟ ${item.id}`}
                     onClick={(e) => { e.stopPropagation(); duplicate(item.id); }}
                   >
@@ -251,6 +257,7 @@ function BriefsInner() {
                     variant="ghost"
                     size="icon-sm"
                     className="max-md:min-h-10 max-md:min-w-10 text-destructive hover:text-destructive"
+                    disabled={!canDelete}
                     aria-label={`ลบ ${item.id}`}
                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(item.id); }}
                   >
@@ -278,13 +285,15 @@ function BriefsInner() {
           title="ยังไม่มีบรีฟในตัวกรองนี้"
           description="สร้างบรีฟใหม่หรือปรับตัวกรองด้านบนเพื่อดูรายการอื่น"
         >
-          <Link
-            href="/briefs/new"
-            className={cn(buttonVariants({ size: "sm" }), "no-underline gap-1.5")}
-          >
-            <MaterialIcon name="add" size={16} />
-            สร้างบรีฟใหม่
-          </Link>
+          {canEdit ? (
+            <Link
+              href="/briefs/new"
+              className={cn(buttonVariants({ size: "sm" }), "no-underline gap-1.5")}
+            >
+              <MaterialIcon name="add" size={16} />
+              สร้างบรีฟใหม่
+            </Link>
+          ) : null}
         </EmptyState>
       )}
     </div>
