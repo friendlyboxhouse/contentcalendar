@@ -70,21 +70,33 @@ export async function middleware(request: NextRequest) {
     const isAuthRoute =
       path.startsWith("/login") ||
       path.startsWith("/auth");
+    const isAccessBlockedRoute = path.startsWith("/access-blocked");
+
+    if (!user && isAccessBlockedRoute) {
+      const loginUrl = buildSafeRedirectUrl(request, "/login");
+      if (loginUrl) return NextResponse.redirect(loginUrl);
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
 
     if (user) {
       const allow = await evaluateEmailAllowlist(supabase, user);
       if (!allow.ok) {
-        await supabase.auth.signOut();
-        const code = allowlistErrorQueryParam(allow.error);
-        const denied = buildSafeRedirectUrl(request, "/login");
-        if (denied) {
-          denied.searchParams.set("error", code);
-          return NextResponse.redirect(denied);
+        const reason = allowlistErrorQueryParam(allow.error);
+        if (!isAccessBlockedRoute) {
+          const blocked = buildSafeRedirectUrl(
+            request,
+            `/access-blocked?reason=${encodeURIComponent(reason)}`
+          );
+          if (blocked) return NextResponse.redirect(blocked);
+          const fb = request.nextUrl.clone();
+          fb.pathname = "/access-blocked";
+          fb.searchParams.set("reason", reason);
+          return NextResponse.redirect(fb);
         }
-        const fallback = request.nextUrl.clone();
-        fallback.pathname = "/login";
-        fallback.searchParams.set("error", code);
-        return NextResponse.redirect(fallback);
+      } else if (isAccessBlockedRoute) {
+        const home = buildSafeRedirectUrl(request, "/");
+        if (home) return NextResponse.redirect(home);
+        return NextResponse.redirect(new URL("/", request.url));
       }
     }
 

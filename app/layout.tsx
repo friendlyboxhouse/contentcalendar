@@ -26,7 +26,8 @@ const notoSansThai = Noto_Sans_Thai({
 
 export const metadata: Metadata = {
   title: "Content Planner — DINKR",
-  description: "ระบบวางแผนคอนเทนต์ Brief Calendar และ Performance",
+  description:
+    "เครื่องมือวางแผนคอนเทนต์ภายในองค์กร — เฉพาะผู้ใช้ในรายการอีเมลที่อนุญาต",
 };
 
 export default function RootLayout({

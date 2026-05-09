@@ -6,8 +6,9 @@ import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 import { ProductionCloudRequired } from "@/components/auth/ProductionCloudRequired";
 
 /**
- * • บนโดเมนจริงถ้าเซิร์ฟเวอร์ไม่เห็น Supabase env → บล็อกแอป (กันเข้าได้โดยไม่ล็อกอิน)
- * • สำรองเมื่อ middleware (Edge) ไม่มี env แต่ client มี session path — พาไป /login ถ้าไม่มี session
+ * • โปรดักชันโดเมนจริงแต่เซิร์ฟเวอร์ไม่เห็น Supabase env → ProductionCloudRequired
+ * • ไม่มี env / ไม่มี session → ไม่เรนเดอร์แอปโฟลเดอร์ (พาไป /login)
+ * • เมลไม่ผ่าน allowlist → middleware พาไป /access-blocked (มี session อยู่)
  */
 export function ClientAuthGate({
   children,
@@ -23,12 +24,15 @@ export function ClientAuthGate({
 
   useLayoutEffect(() => {
     if (blockOpenPlannerWithoutCloud) return;
-    if (!configured || !authHydrated || session) return;
-    const search =
-      typeof window !== "undefined" ? window.location.search ?? "" : "";
-    const nextPath = `${pathname}${search}` || "/";
-    const dest = `/login?next=${encodeURIComponent(nextPath)}`;
-    router.replace(dest);
+    if (!authHydrated) return;
+    /** ไม่มี Supabase = ไม่ให้เปิดแผนที่เครื่องมือแพลนเนอร์โดยไม่ผ่านหน้า login */
+    if (!configured || !session) {
+      const search =
+        typeof window !== "undefined" ? window.location.search ?? "" : "";
+      const nextPath = `${pathname}${search}` || "/";
+      const dest = `/login?next=${encodeURIComponent(nextPath)}`;
+      router.replace(dest);
+    }
   }, [
     blockOpenPlannerWithoutCloud,
     configured,
@@ -40,7 +44,8 @@ export function ClientAuthGate({
 
   useEffect(() => {
     if (blockOpenPlannerWithoutCloud) return;
-    if (!configured || !authHydrated || session) return;
+    if (!authHydrated) return;
+    if (configured && session) return;
     const search =
       typeof window !== "undefined" ? window.location.search ?? "" : "";
     const nextPath = `${pathname}${search}` || "/";
@@ -63,8 +68,24 @@ export function ClientAuthGate({
     return <ProductionCloudRequired />;
   }
 
+  /** บังคับให้ไป /login ก่อน — ห้ามโชว์แดชบอร์ดจนกว่าจะตั้งค่า Supabase + มี session */
   if (!configured) {
-    return <>{children}</>;
+    if (!authHydrated) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-muted/40 px-6">
+          <p className="text-sm text-muted-foreground">
+            กำลังตรวจสอบการเข้าสู่ระบบ…
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-muted/40 px-6">
+        <p className="text-sm text-muted-foreground">
+          กำลังไปหน้าเข้าสู่ระบบ…
+        </p>
+      </div>
+    );
   }
 
   if (!authHydrated) {

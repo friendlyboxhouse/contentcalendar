@@ -35,7 +35,7 @@ export function LoginContent({
 
   const errorMessage = useMemo(() => {
     if (rawError === "email_not_allowlisted") {
-      return "บัญชีอีเมลนี้ไม่อยู่ในรายการที่ได้รับอนุญาต — ติดต่อผู้ดูแลระบบ";
+      return "อีเมลนี้ยังไม่อยู่ในรายการของทีม — แอปใช้เฉพาะภายใน ติดต่อผู้ดูแลให้เพิ่มเมลของคุณ";
     }
     if (rawError === "allowlist_empty") {
       return "ยังไม่ได้ตั้งค่ารายการอีเมลที่อนุญาต (allowed_emails ว่าง) — ให้ผู้ดูแลเพิ่มอย่างน้อยหนึ่งอีเมลใน Supabase";
@@ -115,8 +115,14 @@ export function LoginContent({
       <Card className="w-full max-w-md shadow-md">
         <CardHeader>
           <CardTitle className="text-lg">เข้าสู่ระบบ</CardTitle>
-          <CardDescription>
-            ใช้บัญชี Google เพื่อซิงค์ Brief ไปยังฐานข้อมูลและรับอัปเดตแบบเรียลไทม์
+          <CardDescription className="space-y-2 leading-relaxed">
+            <span className="block font-medium text-foreground">
+              เครื่องมือภายในบริษัท — เฉพาะอีเมลที่ทีมใส่ในรายการเท่านั้น
+              (ทั้งคนที่แก้ไขและคนที่ดูอย่างเดียว)
+            </span>
+            <span className="block text-muted-foreground">
+              ล็อกอินด้วยบัญชี Google ขององค์กรเพื่อซิงค์ Brief และข้อมูลแบบเรียลไทม์
+            </span>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

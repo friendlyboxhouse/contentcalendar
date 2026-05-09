@@ -11,8 +11,9 @@ export type EmailAllowlistResult =
   | { ok: false; error: AllowlistDenialReason };
 
 /**
- * Allowlist เข้ม: ต้องมีอย่างน้อย 1 แถวใน allowed_emails และอีเมลผู้ใช้ต้องอยู่ในรายการ
- * (ตารางว่าง = ไม่ให้ล็อกอิน — ต้องใส่เมลใน Supabase ก่อนเปิดใช้งานจริง)
+ * Allowlist เข้ม (เว็บภายในองค์กร): ทุกคนที่ใช้แอป รวมโหมดดูอย่างเดียว (viewer)
+ * ต้องล็อกอินและมีอีเมลใน allowed_emails เมื่อมีอย่างน้อยหนึ่งแถวในตาราง
+ * (ตารางว่าง = ไม่ให้ล็อกอิน — ops ต้องใส่เมลพนักงานก่อนเปิดใช้งานจริง)
  */
 export async function evaluateEmailAllowlist(
   supabase: SupabaseClient,
