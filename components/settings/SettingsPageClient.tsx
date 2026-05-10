@@ -32,6 +32,9 @@ import {
 import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
 import { cn } from "@/lib/utils";
 import { useContentTypes } from "@/hooks/useContentTypes";
+import { useTaskLists } from "@/hooks/useTaskLists";
+import { useTaskTypes } from "@/hooks/useTaskTypes";
+import { useAssignmentRoles } from "@/hooks/useAssignmentRoles";
 import { buildUserInitials } from "@/lib/initials";
 import { Avatar } from "@/components/ui/avatar";
 import {
@@ -109,6 +112,21 @@ export function SettingsPageClient() {
     loading: contentTypeLoading,
     refresh: refreshContentTypes,
   } = useContentTypes();
+  const {
+    items: taskListRows,
+    activeItems: activeTaskLists,
+    refresh: refreshTaskLists,
+  } = useTaskLists();
+  const {
+    items: taskTypeRows,
+    activeItems: activeTaskTypes,
+    refresh: refreshTaskTypes,
+  } = useTaskTypes();
+  const {
+    items: assignmentRoleRows,
+    activeItems: activeAssignmentRoles,
+    refresh: refreshAssignmentRoles,
+  } = useAssignmentRoles();
 
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -163,6 +181,16 @@ export function SettingsPageClient() {
   const [ctSlugDraft, setCtSlugDraft] = useState("");
   const [ctColorDraft, setCtColorDraft] = useState("#5B6CFF");
   const [contentTypeBusy, setContentTypeBusy] = useState<string | null>(null);
+  const [taskListLabelDraft, setTaskListLabelDraft] = useState("");
+  const [taskListSlugDraft, setTaskListSlugDraft] = useState("");
+  const [taskListBusy, setTaskListBusy] = useState<string | null>(null);
+  const [taskTypeLabelDraft, setTaskTypeLabelDraft] = useState("");
+  const [taskTypeSlugDraft, setTaskTypeSlugDraft] = useState("");
+  const [taskTypeColorDraft, setTaskTypeColorDraft] = useState("#0EA5E9");
+  const [taskTypeBusyId, setTaskTypeBusyId] = useState<string | null>(null);
+  const [assignmentRoleLabelDraft, setAssignmentRoleLabelDraft] = useState("");
+  const [assignmentRoleSlugDraft, setAssignmentRoleSlugDraft] = useState("");
+  const [assignmentRoleBusy, setAssignmentRoleBusy] = useState<string | null>(null);
 
   const [apiKeys, setApiKeys] = useState<
     Array<{
@@ -811,6 +839,234 @@ export function SettingsPageClient() {
     await refreshContentTypes();
   };
 
+  const upsertTaskList = async () => {
+    if (!supabase || !workspaceId) return;
+    const label = taskListLabelDraft.trim();
+    const slug =
+      taskListSlugDraft.trim().toLowerCase() ||
+      label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    if (!label || !slug) {
+      toast.error("กรอกชื่อคอลัมน์งาน");
+      return;
+    }
+    setTaskListBusy("create");
+    const nextOrder =
+      Math.max(0, ...taskListRows.map((row) => Number(row.position || 0))) + 10;
+    const { error } = await supabase.from("task_lists").upsert(
+      {
+        workspace_id: workspaceId,
+        slug,
+        label,
+        position: nextOrder,
+        archived_at: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "workspace_id,slug" }
+    );
+    setTaskListBusy(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setTaskListLabelDraft("");
+    setTaskListSlugDraft("");
+    toast.success("บันทึก task list แล้ว");
+    await refreshTaskLists();
+  };
+
+  const moveTaskList = async (id: string, direction: "up" | "down") => {
+    if (!supabase) return;
+    const list = [...activeTaskLists];
+    const idx = list.findIndex((row) => row.id === id);
+    if (idx < 0) return;
+    const swapWith = direction === "up" ? idx - 1 : idx + 1;
+    if (swapWith < 0 || swapWith >= list.length) return;
+    const current = list[idx];
+    const target = list[swapWith];
+    setTaskListBusy(id);
+    const now = new Date().toISOString();
+    const { error } = await supabase.from("task_lists").upsert([
+      { id: current.id, position: target.position, updated_at: now },
+      { id: target.id, position: current.position, updated_at: now },
+    ]);
+    setTaskListBusy(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await refreshTaskLists();
+  };
+
+  const archiveTaskList = async (id: string) => {
+    if (!supabase) return;
+    setTaskListBusy(id);
+    const { error } = await supabase
+      .from("task_lists")
+      .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", id);
+    setTaskListBusy(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await refreshTaskLists();
+  };
+
+  const upsertTaskType = async () => {
+    if (!supabase || !workspaceId) return;
+    const label = taskTypeLabelDraft.trim();
+    const slug =
+      taskTypeSlugDraft.trim().toLowerCase() ||
+      label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    if (!label || !slug) {
+      toast.error("กรอกชื่อประเภทงาน");
+      return;
+    }
+    setTaskTypeBusyId("create");
+    const nextOrder =
+      Math.max(0, ...taskTypeRows.map((row) => Number(row.position || 0))) + 10;
+    const { error } = await supabase.from("task_types").upsert(
+      {
+        workspace_id: workspaceId,
+        slug,
+        label,
+        color: taskTypeColorDraft.trim() || null,
+        position: nextOrder,
+        archived_at: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "workspace_id,slug" }
+    );
+    setTaskTypeBusyId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setTaskTypeLabelDraft("");
+    setTaskTypeSlugDraft("");
+    toast.success("บันทึก task type แล้ว");
+    await refreshTaskTypes();
+  };
+
+  const moveTaskType = async (id: string, direction: "up" | "down") => {
+    if (!supabase) return;
+    const list = [...activeTaskTypes];
+    const idx = list.findIndex((row) => row.id === id);
+    if (idx < 0) return;
+    const swapWith = direction === "up" ? idx - 1 : idx + 1;
+    if (swapWith < 0 || swapWith >= list.length) return;
+    const current = list[idx];
+    const target = list[swapWith];
+    setTaskTypeBusyId(id);
+    const now = new Date().toISOString();
+    const { error } = await supabase.from("task_types").upsert([
+      { id: current.id, position: target.position, updated_at: now },
+      { id: target.id, position: current.position, updated_at: now },
+    ]);
+    setTaskTypeBusyId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await refreshTaskTypes();
+  };
+
+  const archiveTaskType = async (id: string) => {
+    if (!supabase) return;
+    setTaskTypeBusyId(id);
+    const { error } = await supabase
+      .from("task_types")
+      .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", id);
+    setTaskTypeBusyId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await refreshTaskTypes();
+  };
+
+  const upsertAssignmentRole = async () => {
+    if (!supabase || !workspaceId) return;
+    const label = assignmentRoleLabelDraft.trim();
+    const slug =
+      assignmentRoleSlugDraft.trim().toLowerCase() ||
+      label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    if (!label || !slug) {
+      toast.error("กรอกชื่อบทบาท");
+      return;
+    }
+    setAssignmentRoleBusy("create");
+    const nextOrder =
+      Math.max(0, ...assignmentRoleRows.map((row) => Number(row.position || 0))) + 10;
+    const { error } = await supabase.from("assignment_roles").upsert(
+      {
+        workspace_id: workspaceId,
+        slug,
+        label,
+        position: nextOrder,
+        archived_at: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "workspace_id,slug" }
+    );
+    setAssignmentRoleBusy(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setAssignmentRoleLabelDraft("");
+    setAssignmentRoleSlugDraft("");
+    await refreshAssignmentRoles();
+  };
+
+  const moveAssignmentRole = async (id: string, direction: "up" | "down") => {
+    if (!supabase) return;
+    const list = [...activeAssignmentRoles];
+    const idx = list.findIndex((row) => row.id === id);
+    if (idx < 0) return;
+    const swapWith = direction === "up" ? idx - 1 : idx + 1;
+    if (swapWith < 0 || swapWith >= list.length) return;
+    const current = list[idx];
+    const target = list[swapWith];
+    setAssignmentRoleBusy(id);
+    const now = new Date().toISOString();
+    const { error } = await supabase.from("assignment_roles").upsert([
+      { id: current.id, position: target.position, updated_at: now },
+      { id: target.id, position: current.position, updated_at: now },
+    ]);
+    setAssignmentRoleBusy(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await refreshAssignmentRoles();
+  };
+
+  const archiveAssignmentRole = async (id: string) => {
+    if (!supabase) return;
+    setAssignmentRoleBusy(id);
+    const { error } = await supabase
+      .from("assignment_roles")
+      .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", id);
+    setAssignmentRoleBusy(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await refreshAssignmentRoles();
+  };
+
   const loadApiKeys = useCallback(async () => {
     if (!workspaceId) return;
     setApiKeyBusy(true);
@@ -942,6 +1198,9 @@ export function SettingsPageClient() {
           <TabsTrigger value="project">โปรเจกต์</TabsTrigger>
           <TabsTrigger value="access">การเข้าถึง</TabsTrigger>
           <TabsTrigger value="content-types">Content Types</TabsTrigger>
+          <TabsTrigger value="task-lists">Task Lists</TabsTrigger>
+          <TabsTrigger value="assignment-roles">Assignment Roles</TabsTrigger>
+          <TabsTrigger value="task-types">Task Types</TabsTrigger>
           <TabsTrigger value="workspace">ทีม Workspace</TabsTrigger>
           <TabsTrigger value="integrations">OpenClaw/API</TabsTrigger>
           <TabsTrigger value="appearance">รูปลักษณ์</TabsTrigger>
@@ -1361,6 +1620,228 @@ export function SettingsPageClient() {
                 ) : (
                   <li className="px-3 py-2 text-muted-foreground">ยังไม่มี content type</li>
                 )}
+              </ul>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="task-lists" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Task Lists</CardTitle>
+              <CardDescription>จัดการคอลัมน์บน Trello board</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2 sm:grid-cols-[1fr_180px_auto]">
+                <Input
+                  placeholder="Label เช่น Doing"
+                  value={taskListLabelDraft}
+                  onChange={(e) => setTaskListLabelDraft(e.target.value)}
+                />
+                <Input
+                  placeholder="slug เช่น in_progress"
+                  value={taskListSlugDraft}
+                  onChange={(e) => setTaskListSlugDraft(e.target.value)}
+                />
+                <Button type="button" onClick={() => void upsertTaskList()}>
+                  เพิ่ม
+                </Button>
+              </div>
+              <ul className="divide-y rounded-lg border text-sm">
+                {activeTaskLists.map((row, idx) => (
+                  <li
+                    key={row.id}
+                    className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium">{row.label}</p>
+                      <p className="text-xs text-muted-foreground">{row.slug}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={taskListBusy === row.id || idx === 0}
+                        onClick={() => void moveTaskList(row.id, "up")}
+                      >
+                        ↑
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          taskListBusy === row.id || idx === activeTaskLists.length - 1
+                        }
+                        onClick={() => void moveTaskList(row.id, "down")}
+                      >
+                        ↓
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive"
+                        onClick={() => void archiveTaskList(row.id)}
+                      >
+                        archive
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="assignment-roles" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Assignment Roles</CardTitle>
+              <CardDescription>บทบาทสำหรับ assign หลายคนในงานเดียว</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2 sm:grid-cols-[1fr_180px_auto]">
+                <Input
+                  placeholder="Label เช่น ตัดต่อ"
+                  value={assignmentRoleLabelDraft}
+                  onChange={(e) => setAssignmentRoleLabelDraft(e.target.value)}
+                />
+                <Input
+                  placeholder="slug เช่น editor"
+                  value={assignmentRoleSlugDraft}
+                  onChange={(e) => setAssignmentRoleSlugDraft(e.target.value)}
+                />
+                <Button type="button" onClick={() => void upsertAssignmentRole()}>
+                  เพิ่ม
+                </Button>
+              </div>
+              <ul className="divide-y rounded-lg border text-sm">
+                {activeAssignmentRoles.map((row, idx) => (
+                  <li
+                    key={row.id}
+                    className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium">{row.label}</p>
+                      <p className="text-xs text-muted-foreground">{row.slug}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={assignmentRoleBusy === row.id || idx === 0}
+                        onClick={() => void moveAssignmentRole(row.id, "up")}
+                      >
+                        ↑
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          assignmentRoleBusy === row.id ||
+                          idx === activeAssignmentRoles.length - 1
+                        }
+                        onClick={() => void moveAssignmentRole(row.id, "down")}
+                      >
+                        ↓
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive"
+                        onClick={() => void archiveAssignmentRole(row.id)}
+                      >
+                        archive
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="task-types" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Task Types</CardTitle>
+              <CardDescription>ประเภทงานสำหรับแยกสี/ฟิลเตอร์บน board</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2 sm:grid-cols-[1fr_180px_120px_auto]">
+                <Input
+                  placeholder="Label เช่น Marketing"
+                  value={taskTypeLabelDraft}
+                  onChange={(e) => setTaskTypeLabelDraft(e.target.value)}
+                />
+                <Input
+                  placeholder="slug เช่น marketing"
+                  value={taskTypeSlugDraft}
+                  onChange={(e) => setTaskTypeSlugDraft(e.target.value)}
+                />
+                <Input
+                  type="color"
+                  value={taskTypeColorDraft}
+                  onChange={(e) => setTaskTypeColorDraft(e.target.value)}
+                />
+                <Button type="button" onClick={() => void upsertTaskType()}>
+                  เพิ่ม
+                </Button>
+              </div>
+              <ul className="divide-y rounded-lg border text-sm">
+                {activeTaskTypes.map((row, idx) => (
+                  <li
+                    key={row.id}
+                    className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 font-medium">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: row.color ?? "#0EA5E9" }}
+                        />
+                        {row.label}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{row.slug}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={taskTypeBusyId === row.id || idx === 0}
+                        onClick={() => void moveTaskType(row.id, "up")}
+                      >
+                        ↑
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          taskTypeBusyId === row.id || idx === activeTaskTypes.length - 1
+                        }
+                        onClick={() => void moveTaskType(row.id, "down")}
+                      >
+                        ↓
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive"
+                        onClick={() => void archiveTaskType(row.id)}
+                      >
+                        archive
+                      </Button>
+                    </div>
+                  </li>
+                ))}
               </ul>
             </CardContent>
           </Card>

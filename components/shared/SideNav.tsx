@@ -58,6 +58,7 @@ const nav: {
     mobileLabel: "สถิติ",
     symbol: "analytics",
   },
+  { href: "/board", label: "Board", mobileLabel: "Board", symbol: "view_kanban" },
   { href: "/settings", label: "ตั้งค่า", mobileLabel: "ตั้งค่า", symbol: "settings" },
 ];
 

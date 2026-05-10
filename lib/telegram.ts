@@ -4,6 +4,8 @@ export type TelegramDigestTask = {
   milestoneLabel: string;
   dueAt: Date;
   statusLabel: string;
+  source?: "content" | "task";
+  roleLabel?: string;
   briefUrl?: string;
 };
 
@@ -60,21 +62,44 @@ export function formatDailyDigest(input: DailyDigestInput): string {
     ].join("\n");
   }
 
-  const lines = input.tasks.map((task, idx) => {
-    const safeTopic = task.topic?.trim() || "(ไม่มีหัวข้อ)";
-    const link = task.briefUrl ? `\n   เปิดบรีฟ: ${task.briefUrl}` : "";
-    return [
-      `${idx + 1}. ${task.milestoneLabel} · ${shortTime(task.dueAt)}`,
-      `   ${task.id} · ${safeTopic}`,
-      `   สถานะ: ${task.statusLabel}${link}`,
-    ].join("\n");
-  });
+  const contentTasks = input.tasks.filter((task) => task.source !== "task");
+  const generalTasks = input.tasks.filter((task) => task.source === "task");
+
+  const renderLines = (tasks: TelegramDigestTask[]) =>
+    tasks.map((task, idx) => {
+      const safeTopic = task.topic?.trim() || "(ไม่มีหัวข้อ)";
+      const link = task.briefUrl ? `\n   เปิดลิงก์: ${task.briefUrl}` : "";
+      const role = task.roleLabel ? ` · บทบาท: ${task.roleLabel}` : "";
+      return [
+        `${idx + 1}. ${task.milestoneLabel} · ${shortTime(task.dueAt)}`,
+        `   ${task.id} · ${safeTopic}`,
+        `   สถานะ: ${task.statusLabel}${role}${link}`,
+      ].join("\n");
+    });
+
+  const contentLines = renderLines(contentTasks);
+  const generalLines = renderLines(generalTasks);
+
+  const sections: string[] = [];
+  if (contentLines.length) {
+    sections.push("งานคอนเทนต์วันนี้");
+    sections.push(...contentLines);
+  }
+  if (generalLines.length) {
+    if (sections.length) sections.push("");
+    sections.push("งานอื่น ๆ วันนี้");
+    sections.push(...generalLines);
+  }
+
+  if (!sections.length) {
+    sections.push("วันนี้ยังไม่มีงานที่ assign ให้คุณตามตาราง");
+  }
 
   return [
     `สวัสดี ${input.recipientName}`,
     `สรุปงานวันนี้ (${input.dateLabel})${headerWorkspace}`,
     "",
-    ...lines,
+    ...sections,
     "",
     "อัปเดตจาก Content Planner อัตโนมัติ",
   ].join("\n");

@@ -8,11 +8,17 @@ import type {
   DashboardStats,
   Platform,
   ContentPillar,
+  MilestoneKind,
+  MilestoneStateEntry,
 } from "@/lib/types";
 import { KPI_REMINDER_DAYS } from "@/lib/constants";
 import { reviveContentItems } from "@/lib/revive";
 import { SEED_DATA } from "@/lib/seedData";
 import { computeDashboardStats } from "@/lib/dashboardStats";
+import {
+  getMilestoneEffectiveDate,
+  WORKFLOW_MILESTONE_KINDS,
+} from "@/lib/calendarEvents";
 import {
   emitBulkUpsert,
   emitLocalDelete,
@@ -33,6 +39,20 @@ interface ContentStore {
   removeItemRemote: (id: string) => void;
 
   updateStatus: (id: string, status: ContentStatus) => void;
+  updateMilestoneStatus: (
+    id: string,
+    kind: MilestoneKind,
+    status: ContentStatus
+  ) => void;
+  toggleMilestoneDone: (id: string, kind: MilestoneKind, checked: boolean) => void;
+  updateMilestoneDate: (id: string, kind: MilestoneKind, date: Date) => void;
+  clearMilestoneDateOverride: (id: string, kind: MilestoneKind) => void;
+  shiftMilestonesFrom: (
+    id: string,
+    sourceKind: MilestoneKind,
+    dayDelta: number,
+    mode: "following"
+  ) => void;
   snoozeKPIReminder: (id: string) => void;
 
   getKPIReminderItems: () => ContentItem[];
@@ -64,6 +84,31 @@ function filterItems(
     }
     return pillarMatch && platformMatch && monthMatch;
   });
+}
+
+const MILESTONE_FALLBACK_STATUS: Record<MilestoneKind, ContentStatus> = {
+  brief: "in_brief",
+  briefApprove: "pending_approval",
+  production: "in_production",
+  review: "in_review",
+  mgmtApprove: "pending_approval",
+  publish: "scheduled",
+};
+
+function withMilestoneStateUpdate(
+  item: ContentItem,
+  kind: MilestoneKind,
+  patch: Partial<MilestoneStateEntry>
+): Partial<ContentItem> {
+  return {
+    milestoneState: {
+      ...(item.milestoneState ?? {}),
+      [kind]: {
+        ...(item.milestoneState?.[kind] ?? {}),
+        ...patch,
+      },
+    },
+  };
 }
 
 export const useContentStore = create<ContentStore>()(
@@ -156,6 +201,77 @@ export const useContentStore = create<ContentStore>()(
           updates.publishedAt = undefined;
         }
         get().updateItem(id, updates);
+      },
+
+      updateMilestoneStatus: (id, kind, status) => {
+        const item = get().items.find((entry) => entry.id === id);
+        if (!item) return;
+        get().updateItem(id, withMilestoneStateUpdate(item, kind, { status }));
+      },
+
+      toggleMilestoneDone: (id, kind, checked) => {
+        const item = get().items.find((entry) => entry.id === id);
+        if (!item) return;
+        const current = item.milestoneState?.[kind];
+        const nextStatus = checked
+          ? kind === "publish"
+            ? "published"
+            : "approved"
+          : (current?.status ?? MILESTONE_FALLBACK_STATUS[kind]);
+        get().updateItem(
+          id,
+          withMilestoneStateUpdate(item, kind, {
+            done: checked,
+            status: nextStatus,
+          })
+        );
+      },
+
+      updateMilestoneDate: (id, kind, date) => {
+        const item = get().items.find((entry) => entry.id === id);
+        if (!item) return;
+        const nextDate = new Date(date);
+        nextDate.setHours(12, 0, 0, 0);
+        get().updateItem(
+          id,
+          withMilestoneStateUpdate(item, kind, {
+            dateOverride: nextDate,
+          })
+        );
+      },
+
+      clearMilestoneDateOverride: (id, kind) => {
+        const item = get().items.find((entry) => entry.id === id);
+        if (!item) return;
+        const next = {
+          ...(item.milestoneState ?? {}),
+          [kind]: {
+            ...(item.milestoneState?.[kind] ?? {}),
+            dateOverride: undefined,
+          },
+        };
+        get().updateItem(id, { milestoneState: next });
+      },
+
+      shiftMilestonesFrom: (id, sourceKind, dayDelta, mode) => {
+        if (mode !== "following" || dayDelta === 0) return;
+        const item = get().items.find((entry) => entry.id === id);
+        if (!item) return;
+        const sourceIdx = WORKFLOW_MILESTONE_KINDS.indexOf(sourceKind);
+        if (sourceIdx < 0) return;
+        const nextMilestoneState = { ...(item.milestoneState ?? {}) };
+        const targets = WORKFLOW_MILESTONE_KINDS.slice(sourceIdx + 1);
+        for (const kind of targets) {
+          const baseDate = getMilestoneEffectiveDate(item, kind);
+          const shifted = new Date(baseDate);
+          shifted.setDate(shifted.getDate() + dayDelta);
+          shifted.setHours(12, 0, 0, 0);
+          nextMilestoneState[kind] = {
+            ...(nextMilestoneState[kind] ?? {}),
+            dateOverride: shifted,
+          };
+        }
+        get().updateItem(id, { milestoneState: nextMilestoneState });
       },
 
       getKPIReminderItems: () => {

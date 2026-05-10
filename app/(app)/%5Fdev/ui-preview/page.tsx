@@ -61,6 +61,10 @@ const previewMilestoneEvent: CalendarEvent = {
   id: "POST-999:review",
   item: previewItem,
   date: new Date("2026-05-08T09:00:00.000Z"),
+  recommendedDate: new Date("2026-05-08T09:00:00.000Z"),
+  dateOverridden: false,
+  status: "in_review",
+  done: false,
   kind: "review",
 };
 

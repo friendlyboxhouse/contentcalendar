@@ -44,6 +44,26 @@ export type ContentStatus =
 
 export type RevisionRound = "R1" | "R2" | "R3+";
 
+export type MilestoneKind =
+  | "brief"
+  | "briefApprove"
+  | "production"
+  | "review"
+  | "mgmtApprove"
+  | "publish";
+
+export interface MilestoneStateEntry {
+  status?: ContentStatus;
+  dateOverride?: Date;
+  done?: boolean;
+}
+
+export interface TaskAssignee {
+  userId: string;
+  roleId: string;
+  addedAt: Date;
+}
+
 export interface ContentItem {
   id: string;
   createdAt: Date;
@@ -92,6 +112,8 @@ export interface ContentItem {
 
   approvalTrack?: ApprovalTrackRow[];
   revisionHistory?: RevisionHistoryEntry[];
+  milestoneState?: Partial<Record<MilestoneKind, MilestoneStateEntry>>;
+  assignees?: TaskAssignee[];
 }
 
 export interface ApprovalTrackRow {
@@ -189,3 +211,52 @@ export type StatCardKey =
   | "pendingApproval"
   | "needsRework"
   | "planned";
+
+export interface TaskList {
+  id: string;
+  workspace_id: string;
+  slug: string;
+  label: string;
+  position: number;
+  archived_at: string | null;
+}
+
+export interface AssignmentRole {
+  id: string;
+  workspace_id: string;
+  slug: string;
+  label: string;
+  position: number;
+  archived_at: string | null;
+}
+
+export interface TaskType {
+  id: string;
+  workspace_id: string;
+  slug: string;
+  label: string;
+  color: string | null;
+  position: number;
+  archived_at: string | null;
+}
+
+export interface TaskItem {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description: string | null;
+  task_type_id: string | null;
+  list_id: string | null;
+  due_at: Date | null;
+  due_time: string | null;
+  position: number;
+  payload: {
+    assignees?: TaskAssignee[];
+    source?: "task" | "content";
+    contentId?: string;
+    [key: string]: unknown;
+  };
+  created_by: string | null;
+  created_at: Date;
+  updated_at: Date;
+}

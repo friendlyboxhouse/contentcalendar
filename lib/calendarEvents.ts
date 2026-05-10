@@ -1,20 +1,32 @@
-import type { ContentItem, ContentStatus } from "@/lib/types";
+import type {
+  ContentItem,
+  ContentStatus,
+  MilestoneKind,
+  MilestoneStateEntry,
+} from "@/lib/types";
 import { calculateDeadlines, resolveSLAKey } from "@/lib/utils";
 
 export type CalendarMode = "planned" | "scheduled" | "workflow";
 
-export type CalendarEventKind =
-  | "brief"
-  | "briefApprove"
-  | "production"
-  | "review"
-  | "mgmtApprove"
-  | "publish";
+export type CalendarEventKind = MilestoneKind;
+
+export const WORKFLOW_MILESTONE_KINDS: CalendarEventKind[] = [
+  "brief",
+  "briefApprove",
+  "production",
+  "review",
+  "mgmtApprove",
+  "publish",
+];
 
 export interface CalendarEvent {
   id: string;
   item: ContentItem;
   date: Date;
+  recommendedDate: Date;
+  dateOverridden: boolean;
+  status: ContentStatus;
+  done: boolean;
   kind: CalendarEventKind;
 }
 
@@ -46,32 +58,83 @@ const SCHEDULED_STATUSES = new Set<ContentStatus>([
   "kpi_pending",
 ]);
 
-function createWorkflowEvents(item: ContentItem): CalendarEvent[] {
+const DEFAULT_MILESTONE_STATUS: Record<CalendarEventKind, ContentStatus> = {
+  brief: "in_brief",
+  briefApprove: "pending_approval",
+  production: "in_production",
+  review: "in_review",
+  mgmtApprove: "pending_approval",
+  publish: "scheduled",
+};
+
+function getMilestoneStateEntry(
+  item: ContentItem,
+  kind: CalendarEventKind
+): MilestoneStateEntry | undefined {
+  return item.milestoneState?.[kind];
+}
+
+export function getRecommendedMilestoneDates(
+  item: ContentItem
+): Record<CalendarEventKind, Date> {
   const slaKey = item.slaPresetKey ?? resolveSLAKey(item.format);
   const deadlines = calculateDeadlines(new Date(item.publishDate), slaKey);
-  return [
-    { id: `${item.id}:brief`, item, kind: "brief", date: deadlines.briefDeadline },
-    {
-      id: `${item.id}:briefApprove`,
+  return {
+    brief: deadlines.briefDeadline,
+    briefApprove: deadlines.briefApprovalDeadline,
+    production: deadlines.productionDeadline,
+    review: deadlines.reviewDeadline,
+    mgmtApprove: deadlines.approvalDeadline,
+    publish: new Date(item.publishDate),
+  };
+}
+
+export function getMilestoneEffectiveDate(
+  item: ContentItem,
+  kind: CalendarEventKind
+): Date {
+  const recommended = getRecommendedMilestoneDates(item)[kind];
+  const override = getMilestoneStateEntry(item, kind)?.dateOverride;
+  return override ? new Date(override) : new Date(recommended);
+}
+
+export function getMilestoneStatus(
+  item: ContentItem,
+  kind: CalendarEventKind
+): ContentStatus {
+  return (
+    getMilestoneStateEntry(item, kind)?.status ??
+    item.status ??
+    DEFAULT_MILESTONE_STATUS[kind]
+  );
+}
+
+export function getMilestoneDone(
+  item: ContentItem,
+  kind: CalendarEventKind
+): boolean {
+  return Boolean(getMilestoneStateEntry(item, kind)?.done);
+}
+
+function createWorkflowEvents(item: ContentItem): CalendarEvent[] {
+  const recommendedDates = getRecommendedMilestoneDates(item);
+  return WORKFLOW_MILESTONE_KINDS.map((kind) => {
+    const state = getMilestoneStateEntry(item, kind);
+    const recommendedDate = new Date(recommendedDates[kind]);
+    const effectiveDate = state?.dateOverride
+      ? new Date(state.dateOverride)
+      : new Date(recommendedDate);
+    return {
+      id: `${item.id}:${kind}`,
       item,
-      kind: "briefApprove",
-      date: deadlines.briefApprovalDeadline,
-    },
-    {
-      id: `${item.id}:production`,
-      item,
-      kind: "production",
-      date: deadlines.productionDeadline,
-    },
-    { id: `${item.id}:review`, item, kind: "review", date: deadlines.reviewDeadline },
-    {
-      id: `${item.id}:mgmtApprove`,
-      item,
-      kind: "mgmtApprove",
-      date: deadlines.approvalDeadline,
-    },
-    { id: `${item.id}:publish`, item, kind: "publish", date: new Date(item.publishDate) },
-  ];
+      kind,
+      date: effectiveDate,
+      recommendedDate,
+      dateOverridden: Boolean(state?.dateOverride),
+      status: getMilestoneStatus(item, kind),
+      done: getMilestoneDone(item, kind),
+    };
+  });
 }
 
 function statusInMode(status: ContentStatus, mode: CalendarMode): boolean {
@@ -95,5 +158,9 @@ export function buildCalendarEvents(
       item,
       kind: "publish" as const,
       date: new Date(item.publishDate),
+      recommendedDate: new Date(item.publishDate),
+      dateOverridden: false,
+      status: item.status,
+      done: false,
     }));
 }

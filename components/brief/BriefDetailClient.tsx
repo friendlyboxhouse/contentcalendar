@@ -18,6 +18,9 @@ import type {
   SLAPresetKey,
   ApprovalTrackRow,
   RevisionHistoryEntry,
+  MilestoneKind,
+  MilestoneStateEntry,
+  TaskAssignee,
 } from "@/lib/types";
 import {
   PILLAR_CONFIG,
@@ -76,6 +79,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useContentTypes } from "@/hooks/useContentTypes";
+import { AssigneePicker } from "@/components/shared/AssigneePicker";
 
 const RevisionHistoryCard = dynamic(
   () =>
@@ -340,6 +344,43 @@ export function BriefDetailClient({ briefId }: Props) {
   const setField = <K extends keyof ContentItem>(key: K, val: ContentItem[K]) =>
     setDraft((d) => (d ? { ...d, [key]: val } : d));
 
+  const setMilestoneState = (
+    kind: MilestoneKind,
+    patch: Partial<MilestoneStateEntry>
+  ) => {
+    setDraft((d) =>
+      d
+        ? {
+            ...d,
+            milestoneState: {
+              ...(d.milestoneState ?? {}),
+              [kind]: {
+                ...(d.milestoneState?.[kind] ?? {}),
+                ...patch,
+              },
+            },
+          }
+        : d
+    );
+  };
+
+  const clearMilestoneOverride = (kind: MilestoneKind) => {
+    setDraft((d) =>
+      d
+        ? {
+            ...d,
+            milestoneState: {
+              ...(d.milestoneState ?? {}),
+              [kind]: {
+                ...(d.milestoneState?.[kind] ?? {}),
+                dateOverride: undefined,
+              },
+            },
+          }
+        : d
+    );
+  };
+
   const performStatusChange = (
     next: ContentStatus,
     revRoundArg?: RevisionRound
@@ -601,6 +642,14 @@ export function BriefDetailClient({ briefId }: Props) {
               />
             </div>
             <div>
+              <Label>Assignees</Label>
+              <AssigneePicker
+                value={draft.assignees ?? []}
+                disabled={!canEdit}
+                onChange={(next) => setField("assignees", next as TaskAssignee[])}
+              />
+            </div>
+            <div>
               <Label>Pillar</Label>
               <Select
                 value={draft.pillar}
@@ -751,6 +800,8 @@ export function BriefDetailClient({ briefId }: Props) {
             <SLAPresetPicker
               publishDate={new Date(draft.publishDate)}
               selectedPreset={slaPreset}
+              fallbackStatus={draft.status}
+              milestoneState={draft.milestoneState}
               disabled={!canEdit}
               onPresetChange={(preset) => {
                 const dl = calculateDeadlines(
@@ -768,6 +819,31 @@ export function BriefDetailClient({ briefId }: Props) {
                       }
                     : d
                 );
+              }}
+              onMilestoneStatusChange={(kind, status) => {
+                if (!canEdit) return;
+                setMilestoneState(kind, { status });
+              }}
+              onMilestoneDoneToggle={(kind, checked) => {
+                if (!canEdit) return;
+                setMilestoneState(kind, {
+                  done: checked,
+                  status: checked
+                    ? kind === "publish"
+                      ? "published"
+                      : "approved"
+                    : draft.status,
+                });
+              }}
+              onMilestoneDateChange={(kind, date) => {
+                if (!canEdit) return;
+                const next = new Date(date);
+                next.setHours(12, 0, 0, 0);
+                setMilestoneState(kind, { dateOverride: next });
+              }}
+              onMilestoneDateReset={(kind) => {
+                if (!canEdit) return;
+                clearMilestoneOverride(kind);
               }}
             />
             <Separator />

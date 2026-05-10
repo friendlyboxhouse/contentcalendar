@@ -242,7 +242,7 @@ export function MonthlyReport({
       <div className="page-break" />
 
       {/* Page 2 */}
-      <div className="report-page landscape relative flex flex-col">
+      <div className="report-page relative flex flex-col">
         <div className={SECTION.wrapper}>
           <div className={SECTION.headerWithLine}>
             <div className={SECTION.divider} />

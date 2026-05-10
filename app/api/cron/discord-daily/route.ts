@@ -30,6 +30,13 @@ type ContentRow = {
   payload: Record<string, unknown>;
 };
 
+type TaskRow = {
+  id: string;
+  workspace_id: string;
+  title: string;
+  due_at: string | null;
+};
+
 type DailyLogRow = {
   workspace_id: string;
   channel_id: string;
@@ -166,6 +173,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: contentError.message }, { status: 500 });
   }
 
+  const { data: taskData, error: taskError } = await supabase
+    .from("tasks")
+    .select("id,workspace_id,title,due_at")
+    .in("workspace_id", workspaceIds);
+  if (taskError) {
+    return NextResponse.json({ ok: false, error: taskError.message }, { status: 500 });
+  }
+
   const itemsByWorkspace = new Map<string, ReturnType<typeof reviveContentItem>[]>();
   for (const row of (contentData ?? []) as ContentRow[]) {
     const item = reviveContentItem(row.payload as never);
@@ -173,6 +188,7 @@ export async function POST(request: Request) {
     list.push(item);
     itemsByWorkspace.set(row.workspace_id, list);
   }
+  const taskRows = (taskData ?? []) as TaskRow[];
 
   const digestItemsByWorkspace = new Map<string, DiscordProgressDigestItem[]>();
   for (const workspaceId of workspaceIds) {
@@ -188,7 +204,21 @@ export async function POST(request: Request) {
         dueAt: event.date,
       }))
       .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
-    digestItemsByWorkspace.set(workspaceId, today);
+    const dueTasks = taskRows
+      .filter((row) => row.workspace_id === workspaceId && row.due_at)
+      .filter((row) => getBangkokClock(new Date(row.due_at as string)).dateKey === dateKey)
+      .map((row) => ({
+        id: row.id,
+        topic: row.title,
+        owner: "Task assignees",
+        status: "in_brief" as const,
+        milestoneLabel: "Task",
+        dueAt: new Date(row.due_at as string),
+      }));
+    digestItemsByWorkspace.set(
+      workspaceId,
+      [...today, ...dueTasks].sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
+    );
   }
 
   const alreadySent = new Set<string>();

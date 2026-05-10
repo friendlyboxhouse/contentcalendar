@@ -36,6 +36,20 @@ type ContentRow = {
   payload: Record<string, unknown>;
 };
 
+type TaskRow = {
+  id: string;
+  workspace_id: string;
+  title: string;
+  due_at: string | null;
+  payload: Record<string, unknown> | null;
+};
+
+type AssignmentRoleRow = {
+  id: string;
+  workspace_id: string;
+  label: string;
+};
+
 function getAdminSupabase() {
   const url = getSupabaseUrl();
   const serviceRole = getSupabaseServiceRoleKey();
@@ -228,7 +242,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: contentError.message }, { status: 500 });
   }
 
+  const { data: taskData, error: taskError } = await supabase
+    .from("tasks")
+    .select("id,workspace_id,title,due_at,payload")
+    .in("workspace_id", workspaceIds);
+  if (taskError) {
+    return NextResponse.json({ ok: false, error: taskError.message }, { status: 500 });
+  }
+
+  const { data: roleData, error: roleError } = await supabase
+    .from("assignment_roles")
+    .select("id,workspace_id,label")
+    .in("workspace_id", workspaceIds);
+  if (roleError) {
+    return NextResponse.json({ ok: false, error: roleError.message }, { status: 500 });
+  }
+  const roleLabelById = new Map(
+    ((roleData ?? []) as AssignmentRoleRow[]).map((row) => [row.id, row.label])
+  );
+
   const contentRows = (contentData ?? []) as ContentRow[];
+  const taskRows = (taskData ?? []) as TaskRow[];
   const itemsByWorkspace = new Map<string, ReturnType<typeof reviveContentItem>[]>();
   for (const row of contentRows) {
     const item = reviveContentItem(row.payload as never);
@@ -283,14 +317,48 @@ export async function POST(request: Request) {
 
       for (const event of todayEvents) {
         const ownerUserId = resolveOwnerUserId(event.item.owner, workspaceMembers);
-        if (!ownerUserId || ownerUserId !== profile.id) continue;
+        const milestoneAssignees =
+          event.item.assignees?.map((entry) => entry.userId) ?? [];
+        const isAssignee = milestoneAssignees.includes(profile.id);
+        if (!isAssignee && (!ownerUserId || ownerUserId !== profile.id)) continue;
         userTasks.push({
           id: event.item.id,
           topic: event.item.topic,
           milestoneLabel: CALENDAR_EVENT_META[event.kind].label,
           dueAt: event.date,
           statusLabel: STATUS_CONFIG[event.item.status].label,
+          source: "content",
           briefUrl: baseSite ? `${baseSite}/briefs/${event.item.id}` : undefined,
+        });
+      }
+
+      const workspaceTasks = taskRows.filter(
+        (task) => task.workspace_id === membership.workspace_id
+      );
+      for (const task of workspaceTasks) {
+        if (!task.due_at) continue;
+        const local = getLocalParts(new Date(task.due_at), timing.timezone);
+        if (local.dateKey !== timing.localDateKey) continue;
+        const assignees = Array.isArray(task.payload?.assignees)
+          ? (task.payload?.assignees as Array<{
+              userId?: string;
+              roleId?: string;
+            }>)
+          : [];
+        const myRoles = assignees.filter((entry) => entry.userId === profile.id);
+        if (!myRoles.length) continue;
+        userTasks.push({
+          id: task.id,
+          topic: task.title,
+          milestoneLabel: "Task",
+          dueAt: new Date(task.due_at),
+          statusLabel: "Open",
+          source: "task",
+          roleLabel: myRoles
+            .map((entry) => (entry.roleId ? roleLabelById.get(entry.roleId) : null))
+            .filter(Boolean)
+            .join(", "),
+          briefUrl: baseSite ? `${baseSite}/tasks/${task.id}` : undefined,
         });
       }
     }

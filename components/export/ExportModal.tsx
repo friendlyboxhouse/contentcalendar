@@ -9,7 +9,7 @@ import {
   startOfWeek,
 } from "date-fns";
 import type { ContentItem } from "@/lib/types";
-import { PRINT_STYLES } from "@/lib/reportStyles";
+import { buildReportPrintStyles } from "@/lib/reportStyles";
 import { getMonthlyItems, getWeeklyItems } from "@/lib/reportUtils";
 import {
   Dialog,
@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { MaterialIcon } from "@/components/ui/material-icon";
 
 type ReportKind = "weekly" | "monthly";
+type OrientationMode = "auto" | "portrait" | "landscape";
 
 function injectHeadFragment(html: string) {
   const tpl = document.createElement("template");
@@ -48,6 +49,7 @@ export function ExportModal({
   reportFooterNote = "",
 }: ExportModalProps) {
   const [kind, setKind] = useState<ReportKind>("weekly");
+  const [orientation, setOrientation] = useState<OrientationMode>("auto");
   const [weekIdx, setWeekIdx] = useState(4);
   const [monthIdx, setMonthIdx] = useState(3);
   const [includePerformance, setIncludePerformance] = useState(true);
@@ -71,6 +73,14 @@ export function ExportModal({
   const selectedMonth = monthOptions[monthIdx] ?? monthOptions[3];
   const selYear = selectedMonth.getFullYear();
   const selMonthNum = selectedMonth.getMonth() + 1;
+  const effectiveOrientation =
+    orientation === "auto"
+      ? kind === "monthly"
+        ? "landscape"
+        : "portrait"
+      : orientation;
+  const orientationLabel =
+    effectiveOrientation === "landscape" ? "A4 - แนวนอน" : "A4 - แนวตั้ง";
 
   const scrollPreview = () => {
     document.getElementById("report-print-root")?.scrollIntoView({
@@ -80,19 +90,12 @@ export function ExportModal({
   };
 
   const handleExportPdf = () => {
-    injectHeadFragment(PRINT_STYLES);
-
-    const orientationStyle = document.createElement("style");
-    orientationStyle.id = "report-orientation";
-    orientationStyle.textContent =
-      "@media print { @page { size: A4 portrait; margin: 0; } }";
-    document.head.appendChild(orientationStyle);
+    injectHeadFragment(buildReportPrintStyles(effectiveOrientation));
 
     window.setTimeout(() => {
       window.print();
       const cleanup = () => {
         document.getElementById("report-print-styles")?.remove();
-        document.getElementById("report-orientation")?.remove();
         window.removeEventListener("afterprint", cleanup);
       };
       window.addEventListener("afterprint", cleanup);
@@ -196,6 +199,53 @@ export function ExportModal({
               )}
             </section>
 
+            <section>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                การวางหน้ากระดาษ
+              </p>
+              <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setOrientation("auto")}
+                  className={cn(
+                    "px-2 py-2 text-center text-[12px] font-medium transition-colors",
+                    orientation === "auto"
+                      ? "bg-gray-900 text-white"
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}
+                >
+                  Auto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrientation("portrait")}
+                  className={cn(
+                    "border-x border-gray-200 px-2 py-2 text-center text-[12px] font-medium transition-colors",
+                    orientation === "portrait"
+                      ? "bg-gray-900 text-white"
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}
+                >
+                  แนวตั้ง
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrientation("landscape")}
+                  className={cn(
+                    "px-2 py-2 text-center text-[12px] font-medium transition-colors",
+                    orientation === "landscape"
+                      ? "bg-gray-900 text-white"
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}
+                >
+                  แนวนอน
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] text-gray-500">
+                Auto: รายสัปดาห์เป็นแนวตั้ง และรายเดือนเป็นแนวนอน
+              </p>
+            </section>
+
             <section className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 ตัวเลือก
@@ -274,7 +324,17 @@ export function ExportModal({
 
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
           <div className="flex-1 overflow-y-auto p-6 md:p-10">
-            <div className="report-scale-wrapper mx-auto origin-top scale-[0.75]">
+            <div className="mx-auto mb-4 inline-flex rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-[11px] font-medium text-gray-700">
+              {orientationLabel}
+            </div>
+            <div
+              className={cn(
+                "report-scale-wrapper mx-auto origin-top scale-[0.75]",
+                effectiveOrientation === "landscape"
+                  ? "w-[1123px]"
+                  : "w-[794px]"
+              )}
+            >
               <div id="report-print-root" className="bg-white">
                 {kind === "weekly" ? (
                   <WeeklyReport
@@ -306,7 +366,7 @@ export function ExportModal({
               </div>
             </div>
             <p className="mt-4 text-center text-xs text-gray-400">
-              ตัวอย่างแสดง 75% — ไฟล์ PDF เต็มขนาดจริง
+              ตัวอย่างแสดง 75% ({orientationLabel}) - ไฟล์ PDF เต็มขนาดจริง
             </p>
           </div>
         </div>

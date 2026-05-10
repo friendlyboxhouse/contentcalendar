@@ -2,7 +2,11 @@
 
 import { useDeferredValue, useMemo, useState, useEffect } from "react";
 import { useContentStore } from "@/store/contentStore";
-import type { ContentItem, PlannerFilters } from "@/lib/types";
+import type {
+  ContentItem,
+  PlannerFilters,
+  MilestoneKind,
+} from "@/lib/types";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { ActiveFilterChips } from "@/components/shared/ActiveFilterChips";
 import { CalendarGrid } from "@/components/calendar/CalendarGrid";
@@ -41,12 +45,28 @@ import {
   type CalendarMode,
 } from "@/lib/calendarEvents";
 import { PageHeader } from "@/components/ui/page-header";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+
+function toDateInputValue(date: Date): string {
+  const d = new Date(date);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 export function CalendarPageClient() {
   const hydrated = useContentStoreHydrated();
   const { workspaceLoading, contentSyncedOnce } = useSupabaseApp();
   const items = useContentStore((s) => s.items);
   const updateStatus = useContentStore((s) => s.updateStatus);
+  const updateMilestoneStatus = useContentStore((s) => s.updateMilestoneStatus);
+  const updateMilestoneDate = useContentStore((s) => s.updateMilestoneDate);
+  const clearMilestoneDateOverride = useContentStore(
+    (s) => s.clearMilestoneDateOverride
+  );
+  const toggleMilestoneDone = useContentStore((s) => s.toggleMilestoneDone);
   const deleteItem = useContentStore((s) => s.deleteItem);
   const [month, setMonth] = useState(() => new Date());
   const [selected, setSelected] = useState<ContentItem | null>(null);
@@ -118,6 +138,10 @@ export function CalendarPageClient() {
           key: event.id,
           item: event.item,
           date: event.date,
+          recommendedDate: event.recommendedDate,
+          dateOverridden: event.dateOverridden,
+          status: event.status,
+          done: event.done,
           kind: event.kind,
         }));
     }
@@ -131,6 +155,10 @@ export function CalendarPageClient() {
         key: item.id,
         item,
         date: item.publishDate,
+        recommendedDate: item.publishDate,
+        dateOverridden: false,
+        status: item.status,
+        done: false,
         kind: "publish" as const,
       }));
   }, [events, calendarMode]);
@@ -226,6 +254,8 @@ export function CalendarPageClient() {
           onMonthChange={setMonth}
           onOpenChip={setSelected}
           draggable={canDragCalendar && calendarMode !== "workflow"}
+          workflowMode={calendarMode === "workflow"}
+          canEditMilestones={canChangeStatus}
         />
       ) : (
         <div className="rounded-xl border bg-card shadow-sm">
@@ -243,6 +273,7 @@ export function CalendarPageClient() {
                   <TableHead>Milestone</TableHead>
                 ) : null}
                 <TableHead>{calendarMode === "workflow" ? "Date" : "Publish"}</TableHead>
+                {calendarMode === "workflow" ? <TableHead>Recommended</TableHead> : null}
                 <TableHead>Countdown</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -274,13 +305,40 @@ export function CalendarPageClient() {
                   </TableCell>
                   <TableCell>
                     <StatusBadge
-                      status={item.status}
+                      status={
+                        calendarMode === "workflow" ? row.status : item.status
+                      }
                       editable={canChangeStatus}
                       onChange={(st) => {
+                        if (calendarMode === "workflow") {
+                          updateMilestoneStatus(
+                            item.id,
+                            row.kind as MilestoneKind,
+                            st
+                          );
+                          toast.success(`อัปเดต milestone เป็น ${st}`);
+                          return;
+                        }
                         updateStatus(item.id, st);
                         toast.success(`อัปเดตเป็น ${st}`);
                       }}
                     />
+                    {calendarMode === "workflow" ? (
+                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                        <Checkbox
+                          checked={row.done}
+                          disabled={!canChangeStatus}
+                          onCheckedChange={(checked) => {
+                            toggleMilestoneDone(
+                              item.id,
+                              row.kind as MilestoneKind,
+                              checked === true
+                            );
+                          }}
+                        />
+                        <span>Done</span>
+                      </div>
+                    ) : null}
                   </TableCell>
                   <TableCell>{item.owner}</TableCell>
                   {calendarMode === "workflow" ? (
@@ -296,8 +354,51 @@ export function CalendarPageClient() {
                     </TableCell>
                   ) : null}
                   <TableCell className="whitespace-nowrap text-xs">
-                    {new Date(row.date).toLocaleDateString("th-TH")}
+                    {calendarMode === "workflow" ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="date"
+                          value={toDateInputValue(new Date(row.date))}
+                          disabled={!canChangeStatus}
+                          onChange={(e) => {
+                            if (!e.target.value) return;
+                            const next = new Date(`${e.target.value}T12:00:00`);
+                            updateMilestoneDate(
+                              item.id,
+                              row.kind as MilestoneKind,
+                              next
+                            );
+                            toast.success("อัปเดตวัน milestone แล้ว");
+                          }}
+                          className="h-8 w-[150px] text-xs"
+                        />
+                        {row.dateOverridden ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={!canChangeStatus}
+                            onClick={() => {
+                              clearMilestoneDateOverride(
+                                item.id,
+                                row.kind as MilestoneKind
+                              );
+                              toast.success("รีเซ็ตกลับวันแนะนำแล้ว");
+                            }}
+                          >
+                            Reset
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      new Date(row.date).toLocaleDateString("th-TH")
+                    )}
                   </TableCell>
+                  {calendarMode === "workflow" ? (
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                      {new Date(row.recommendedDate).toLocaleDateString("th-TH")}
+                    </TableCell>
+                  ) : null}
                   <TableCell>
                     <CountdownTimer targetDate={row.date} compact />
                   </TableCell>

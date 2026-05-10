@@ -2,10 +2,10 @@
 
 import { useDroppable } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
-import type { ContentItem } from "@/lib/types";
+import type { ContentItem, ContentStatus } from "@/lib/types";
 import { ContentChip } from "@/components/calendar/ContentChip";
 import { MilestoneChip } from "@/components/calendar/MilestoneChip";
-import type { CalendarEvent } from "@/lib/calendarEvents";
+import type { CalendarEvent, CalendarEventKind } from "@/lib/calendarEvents";
 import { isSameMonth } from "date-fns";
 
 export function CalendarDayCell({
@@ -14,12 +14,30 @@ export function CalendarDayCell({
   events,
   onOpenChip,
   draggable,
+  workflowMode = false,
+  milestoneDraggable = false,
+  milestoneEditable = false,
+  onMilestoneStatusChange,
+  onMilestoneDoneToggle,
 }: {
   day: Date;
   currentMonth: Date;
   events: CalendarEvent[];
   onOpenChip: (item: ContentItem) => void;
   draggable: boolean;
+  workflowMode?: boolean;
+  milestoneDraggable?: boolean;
+  milestoneEditable?: boolean;
+  onMilestoneStatusChange?: (
+    itemId: string,
+    kind: CalendarEventKind,
+    status: ContentStatus
+  ) => void;
+  onMilestoneDoneToggle?: (
+    itemId: string,
+    kind: CalendarEventKind,
+    checked: boolean
+  ) => void;
 }) {
   const y = day.getFullYear();
   const m = String(day.getMonth() + 1).padStart(2, "0");
@@ -48,7 +66,7 @@ export function CalendarDayCell({
       </div>
       <div className="flex flex-col gap-0">
         {events.map((event) =>
-          event.kind === "publish" ? (
+          event.kind === "publish" && !workflowMode ? (
             <ContentChip
               key={event.id}
               item={event.item}
@@ -59,6 +77,14 @@ export function CalendarDayCell({
             <MilestoneChip
               key={event.id}
               event={event}
+              draggable={milestoneDraggable}
+              editable={milestoneEditable}
+              onStatusChange={(status) =>
+                onMilestoneStatusChange?.(event.item.id, event.kind, status)
+              }
+              onDoneToggle={(checked) =>
+                onMilestoneDoneToggle?.(event.item.id, event.kind, checked)
+              }
               onOpen={(selectedEvent) => onOpenChip(selectedEvent.item)}
             />
           )

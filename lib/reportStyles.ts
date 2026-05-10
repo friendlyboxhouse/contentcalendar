@@ -1,9 +1,16 @@
 /** Inject into `<head>` before `window.print()` */
-export const PRINT_STYLES = `
+export function buildReportPrintStyles(
+  orientation: "portrait" | "landscape"
+): string {
+  const pageWidth = orientation === "landscape" ? "297mm" : "210mm";
+  const pageHeight = orientation === "landscape" ? "210mm" : "297mm";
+  const pagePadding = orientation === "landscape" ? "12mm 14mm" : "14mm";
+
+  return `
 <style id="report-print-styles">
   @media print {
     @page {
-      size: A4 portrait;
+      size: A4 ${orientation};
       margin: 0;
     }
 
@@ -17,10 +24,8 @@ export const PRINT_STYLES = `
     }
 
     #report-print-root {
-      position: fixed;
-      top: 0;
-      left: 0;
       width: 100%;
+      margin: 0 auto;
     }
 
     .report-scale-wrapper {
@@ -54,25 +59,19 @@ export const PRINT_STYLES = `
     }
 
     .no-print,
-    button,
     nav,
-    aside {
+    aside,
+    #report-print-root button {
       display: none !important;
     }
 
     .report-page {
-      width: 794px;
-      min-height: 1123px;
-      padding: 48px;
+      width: ${pageWidth};
+      min-height: ${pageHeight};
+      padding: ${pagePadding};
       box-sizing: border-box;
       background: white;
       position: relative;
-    }
-
-    .report-page.landscape {
-      width: 1123px;
-      min-height: 794px;
-      padding: 40px 48px;
     }
 
     body {
@@ -100,6 +99,7 @@ export const PRINT_STYLES = `
   }
 </style>
 `;
+}
 
 export const REPORT_FONT_SIZES = {
   reportTitle: "text-[28px]",

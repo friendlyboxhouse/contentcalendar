@@ -12,9 +12,10 @@ import {
 import { createBrowserClient } from "@supabase/ssr";
 import type { RealtimeChannel, Session, SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import type { ContentItem } from "@/lib/types";
-import { reviveContentItems } from "@/lib/revive";
+import type { ContentItem, TaskItem } from "@/lib/types";
+import { reviveContentItems, reviveTaskItems } from "@/lib/revive";
 import { useContentStore } from "@/store/contentStore";
+import { useTaskStore } from "@/store/taskStore";
 import {
   clearSyncHandlers,
   runAsRemoteApply,
@@ -552,6 +553,7 @@ export function SupabaseAppProvider({
     setContentSyncedOnce(false);
     runAsRemoteApply(() => {
       useContentStore.getState().replaceAllItems([]);
+      useTaskStore.getState().replaceAllItems([]);
     });
     if (typeof window !== "undefined") {
       window.localStorage.setItem(ACTIVE_WORKSPACE_KEY, match.id);
@@ -564,6 +566,7 @@ export function SupabaseAppProvider({
     clearSyncHandlers();
     runAsRemoteApply(() => {
       useContentStore.getState().replaceAllItems([]);
+      useTaskStore.getState().replaceAllItems([]);
     });
     setWorkspaceId(null);
     setWorkspaceRole(null);
@@ -583,14 +586,17 @@ export function SupabaseAppProvider({
     await supabase.auth.signOut();
     runAsRemoteApply(() => {
       useContentStore.getState().replaceAllItems([]);
+      useTaskStore.getState().replaceAllItems([]);
     });
     clearPlannerClientStorage(DEMO_KEY);
   }, [supabase]);
 
-  const channelRef = useRef<RealtimeChannel | null>(null);
+  const contentChannelRef = useRef<RealtimeChannel | null>(null);
+  const taskChannelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
-    channelRef.current = null;
+    contentChannelRef.current = null;
+    taskChannelRef.current = null;
 
     if (!supabase || !configured || !session?.user || !workspaceId) {
       clearSyncHandlers();
@@ -642,10 +648,70 @@ export function SupabaseAppProvider({
       if (error) toastSupabasePersistError(error);
     };
 
+    const upsertTask = async (task: TaskItem) => {
+      const payload = JSON.parse(
+        JSON.stringify(task.payload ?? {})
+      ) as Record<string, unknown>;
+      const { error } = await supabase.from("tasks").upsert(
+        {
+          id: task.id,
+          workspace_id: wsId,
+          title: task.title,
+          description: task.description,
+          task_type_id: task.task_type_id,
+          list_id: task.list_id,
+          due_at: task.due_at ? new Date(task.due_at).toISOString() : null,
+          due_time: task.due_time,
+          position: task.position ?? 0,
+          payload,
+          created_by: task.created_by ?? userId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
+      if (error) toastSupabasePersistError(error);
+    };
+
+    const deleteTaskRow = async (id: string) => {
+      const { error } = await supabase
+        .from("tasks")
+        .delete()
+        .eq("id", id)
+        .eq("workspace_id", wsId);
+      if (error) toastSupabasePersistError(error);
+    };
+
+    const bulkUpsertTasks = async (tasks: TaskItem[]) => {
+      if (!tasks.length) return;
+      const rows = tasks.map((task) => ({
+        id: task.id,
+        workspace_id: wsId,
+        title: task.title,
+        description: task.description,
+        task_type_id: task.task_type_id,
+        list_id: task.list_id,
+        due_at: task.due_at ? new Date(task.due_at).toISOString() : null,
+        due_time: task.due_time,
+        position: task.position ?? 0,
+        payload: JSON.parse(
+          JSON.stringify(task.payload ?? {})
+        ) as Record<string, unknown>,
+        created_by: task.created_by ?? userId,
+        updated_at: new Date().toISOString(),
+      }));
+      const { error } = await supabase
+        .from("tasks")
+        .upsert(rows, { onConflict: "id" });
+      if (error) toastSupabasePersistError(error);
+    };
+
     setSyncHandlers({
       upsertItem,
       deleteItem: deleteItemRow,
       bulkUpsert,
+      upsertTask,
+      deleteTask: deleteTaskRow,
+      bulkUpsertTasks,
     });
 
     void (async () => {
@@ -670,11 +736,29 @@ export function SupabaseAppProvider({
       runAsRemoteApply(() => {
         useContentStore.getState().replaceAllItems(revived);
       });
+
+      const { data: taskData, error: taskError } = await supabase
+        .from("tasks")
+        .select(
+          "id,workspace_id,title,description,task_type_id,list_id,due_at,due_time,position,payload,created_by,created_at,updated_at"
+        )
+        .eq("workspace_id", wsId)
+        .order("updated_at", { ascending: false });
+      if (taskError) {
+        toastSupabasePersistError(taskError);
+        setContentSyncedOnce(true);
+        return;
+      }
+      runAsRemoteApply(() => {
+        useTaskStore.getState().replaceAllItems(
+          reviveTaskItems((taskData ?? []) as TaskItem[])
+        );
+      });
       setContentSyncedOnce(true);
 
       if (cancelled) return;
 
-      const channel = supabase
+      const contentChannel = supabase
         .channel(`content_items:${wsId}`)
         .on(
           "postgres_changes",
@@ -705,15 +789,51 @@ export function SupabaseAppProvider({
         )
         .subscribe();
 
-      channelRef.current = channel;
+      contentChannelRef.current = contentChannel;
+
+      const taskChannel = supabase
+        .channel(`tasks:${wsId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "tasks",
+            filter: `workspace_id=eq.${wsId}`,
+          },
+          (payload) => {
+            if (payload.eventType === "DELETE") {
+              const id = (payload.old as { id?: string })?.id;
+              if (id) {
+                runAsRemoteApply(() => {
+                  useTaskStore.getState().removeItemRemote(id);
+                });
+              }
+              return;
+            }
+            const row = payload.new as TaskItem;
+            if (row?.id) {
+              const task = reviveTaskItems([row])[0];
+              runAsRemoteApply(() => {
+                useTaskStore.getState().applyRemoteUpsert(task);
+              });
+            }
+          }
+        )
+        .subscribe();
+
+      taskChannelRef.current = taskChannel;
     })();
 
     return () => {
       cancelled = true;
       clearSyncHandlers();
-      const ch = channelRef.current;
-      channelRef.current = null;
-      if (ch && supabase) void supabase.removeChannel(ch);
+      const contentCh = contentChannelRef.current;
+      const taskCh = taskChannelRef.current;
+      contentChannelRef.current = null;
+      taskChannelRef.current = null;
+      if (contentCh && supabase) void supabase.removeChannel(contentCh);
+      if (taskCh && supabase) void supabase.removeChannel(taskCh);
     };
   }, [configured, session?.user, supabase, workspaceId]);
 
