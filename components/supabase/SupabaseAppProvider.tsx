@@ -65,6 +65,11 @@ type Ctx = {
   canAccessAdmin: boolean;
   /** ชื่อที่ใช้ในแอป (จาก profiles.display_name) */
   displayName: string | null;
+  telegramChatId: string | null;
+  telegramUsername: string | null;
+  telegramNotificationsEnabled: boolean;
+  telegramDailyTime: string;
+  telegramTimezone: string;
   organizationName: string;
   organizationTagline: string;
   reportFooterNote: string;
@@ -90,6 +95,11 @@ const SupabaseAppContext = createContext<Ctx>({
   refreshWorkspace: async () => {},
   canAccessAdmin: false,
   displayName: null,
+  telegramChatId: null,
+  telegramUsername: null,
+  telegramNotificationsEnabled: false,
+  telegramDailyTime: "08:00",
+  telegramTimezone: "Asia/Bangkok",
   organizationName: "DINKR",
   organizationTagline: "",
   reportFooterNote: "",
@@ -123,6 +133,11 @@ export function SupabaseAppProvider({
   const [authHydrated, setAuthHydrated] = useState(false);
   const [role, setRole] = useState<PlannerRole>("editor");
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [telegramChatId, setTelegramChatId] = useState<string | null>(null);
+  const [telegramUsername, setTelegramUsername] = useState<string | null>(null);
+  const [telegramNotificationsEnabled, setTelegramNotificationsEnabled] = useState(false);
+  const [telegramDailyTime, setTelegramDailyTime] = useState("08:00");
+  const [telegramTimezone, setTelegramTimezone] = useState("Asia/Bangkok");
   const [organizationName, setOrganizationName] = useState("DINKR");
   const [organizationTagline, setOrganizationTagline] = useState("");
   const [reportFooterNote, setReportFooterNote] = useState("");
@@ -172,19 +187,31 @@ export function SupabaseAppProvider({
       setRole("editor");
       setCanAccessAdmin(false);
       setDisplayName(null);
+      setTelegramChatId(null);
+      setTelegramUsername(null);
+      setTelegramNotificationsEnabled(false);
+      setTelegramDailyTime("08:00");
+      setTelegramTimezone("Asia/Bangkok");
       setLoadingProfile(false);
       return;
     }
     setLoadingProfile(true);
     const { data, error } = await supabase
       .from("profiles")
-      .select("role, display_name")
+      .select(
+        "role, display_name, telegram_chat_id, telegram_username, telegram_notifications_enabled, telegram_daily_time, telegram_timezone"
+      )
       .eq("id", session.user.id)
       .maybeSingle();
     if (error) {
       console.warn(error.message);
       setRole("editor");
       setDisplayName(null);
+      setTelegramChatId(null);
+      setTelegramUsername(null);
+      setTelegramNotificationsEnabled(false);
+      setTelegramDailyTime("08:00");
+      setTelegramTimezone("Asia/Bangkok");
       setCanAccessAdmin(false);
     } else {
       const r = data?.role as PlannerRole | undefined;
@@ -192,6 +219,29 @@ export function SupabaseAppProvider({
       const dn = data?.display_name;
       setDisplayName(
         typeof dn === "string" && dn.trim() ? dn.trim() : null
+      );
+      const chatIdRaw = data?.telegram_chat_id;
+      setTelegramChatId(
+        typeof chatIdRaw === "string" && chatIdRaw.trim() ? chatIdRaw.trim() : null
+      );
+      const usernameRaw = data?.telegram_username;
+      setTelegramUsername(
+        typeof usernameRaw === "string" && usernameRaw.trim()
+          ? usernameRaw.trim()
+          : null
+      );
+      setTelegramNotificationsEnabled(Boolean(data?.telegram_notifications_enabled));
+      const dailyTimeRaw = data?.telegram_daily_time;
+      setTelegramDailyTime(
+        typeof dailyTimeRaw === "string" && /^\d{2}:\d{2}$/.test(dailyTimeRaw)
+          ? dailyTimeRaw
+          : "08:00"
+      );
+      const timezoneRaw = data?.telegram_timezone;
+      setTelegramTimezone(
+        typeof timezoneRaw === "string" && timezoneRaw.trim()
+          ? timezoneRaw.trim()
+          : "Asia/Bangkok"
       );
       const { data: portalAdmin, error: adminErr } = await supabase.rpc(
         "is_admin_email"
@@ -587,6 +637,11 @@ export function SupabaseAppProvider({
       refreshWorkspace,
       canAccessAdmin,
       displayName,
+      telegramChatId,
+      telegramUsername,
+      telegramNotificationsEnabled,
+      telegramDailyTime,
+      telegramTimezone,
       organizationName,
       organizationTagline,
       reportFooterNote,
@@ -611,6 +666,11 @@ export function SupabaseAppProvider({
       refreshWorkspace,
       canAccessAdmin,
       displayName,
+      telegramChatId,
+      telegramUsername,
+      telegramNotificationsEnabled,
+      telegramDailyTime,
+      telegramTimezone,
       organizationName,
       organizationTagline,
       reportFooterNote,

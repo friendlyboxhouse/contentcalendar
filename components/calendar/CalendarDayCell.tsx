@@ -4,18 +4,20 @@ import { useDroppable } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import type { ContentItem } from "@/lib/types";
 import { ContentChip } from "@/components/calendar/ContentChip";
+import { MilestoneChip } from "@/components/calendar/MilestoneChip";
+import type { CalendarEvent } from "@/lib/calendarEvents";
 import { isSameMonth } from "date-fns";
 
 export function CalendarDayCell({
   day,
   currentMonth,
-  items,
+  events,
   onOpenChip,
   draggable,
 }: {
   day: Date;
   currentMonth: Date;
-  items: ContentItem[];
+  events: CalendarEvent[];
   onOpenChip: (item: ContentItem) => void;
   draggable: boolean;
 }) {
@@ -45,14 +47,22 @@ export function CalendarDayCell({
         {day.getDate()}
       </div>
       <div className="flex flex-col gap-0">
-        {items.map((item) => (
-          <ContentChip
-            key={item.id}
-            item={item}
-            draggable={draggable}
-            onOpen={onOpenChip}
-          />
-        ))}
+        {events.map((event) =>
+          event.kind === "publish" ? (
+            <ContentChip
+              key={event.id}
+              item={event.item}
+              draggable={draggable}
+              onOpen={onOpenChip}
+            />
+          ) : (
+            <MilestoneChip
+              key={event.id}
+              event={event}
+              onOpen={(selectedEvent) => onOpenChip(selectedEvent.item)}
+            />
+          )
+        )}
       </div>
     </div>
   );

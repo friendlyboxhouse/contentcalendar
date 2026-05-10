@@ -16,6 +16,10 @@ export function getSupabaseAnonKey(): string | undefined {
   );
 }
 
+export function getSupabaseServiceRoleKey(): string | undefined {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+}
+
 export function isSupabaseConfigured(): boolean {
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();

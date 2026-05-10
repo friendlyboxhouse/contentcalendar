@@ -61,7 +61,7 @@ export function SLAPresetPicker({
         </SelectContent>
       </Select>
 
-      <Card className="border-0 bg-slate-50 dark:bg-slate-900/40">
+      <Card className="border-0 bg-muted/40">
         <CardContent className="space-y-2 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Deadline Timeline · {sla.emoji} {sla.label}
@@ -81,10 +81,10 @@ export function SLAPresetPicker({
             { label: "🚀 Publish", date: publishDate },
           ].map((step, i) => (
             <div key={i} className="flex items-center justify-between text-sm">
-              <span className="text-slate-600 dark:text-slate-300">
+              <span className="text-muted-foreground">
                 {step.label}
               </span>
-              <span className="font-medium text-slate-800 dark:text-slate-100">
+              <span className="font-medium text-foreground">
                 {step.date.toLocaleDateString("th-TH", {
                   day: "numeric",
                   month: "short",

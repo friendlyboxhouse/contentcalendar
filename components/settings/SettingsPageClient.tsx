@@ -45,6 +45,13 @@ const ROLE_HELP: Record<PlannerRole, { title: string; body: string }> = {
   },
 };
 
+type DiscordChannelRow = {
+  id: string;
+  channel_name: string;
+  webhook_url: string;
+  is_enabled: boolean;
+};
+
 export function SettingsPageClient() {
   const {
     supabase,
@@ -59,6 +66,11 @@ export function SettingsPageClient() {
     refreshWorkspace,
     canAccessAdmin,
     displayName,
+    telegramChatId,
+    telegramUsername,
+    telegramNotificationsEnabled,
+    telegramDailyTime,
+    telegramTimezone,
     organizationName,
     organizationTagline,
     loadingProfile,
@@ -74,6 +86,11 @@ export function SettingsPageClient() {
 
   const [nameDraft, setNameDraft] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
+  const [savingTelegram, setSavingTelegram] = useState(false);
+  const [linkingTelegram, setLinkingTelegram] = useState(false);
+  const [telegramEnabledDraft, setTelegramEnabledDraft] = useState(false);
+  const [telegramTimeDraft, setTelegramTimeDraft] = useState("08:00");
+  const [telegramTimezoneDraft, setTelegramTimezoneDraft] = useState("Asia/Bangkok");
 
   const [orgNameDraft, setOrgNameDraft] = useState("");
   const [taglineDraft, setTaglineDraft] = useState("");
@@ -86,12 +103,24 @@ export function SettingsPageClient() {
   const [memberActionBusy, setMemberActionBusy] = useState<string | null>(null);
   const [mergeSourceWorkspace, setMergeSourceWorkspace] = useState<string>("");
   const [mergingWorkspace, setMergingWorkspace] = useState(false);
+  const [discordChannels, setDiscordChannels] = useState<DiscordChannelRow[]>([]);
+  const [discordChannelNameDraft, setDiscordChannelNameDraft] = useState("");
+  const [discordWebhookDraft, setDiscordWebhookDraft] = useState("");
+  const [discordBusyId, setDiscordBusyId] = useState<string | null>(null);
+  const [discordSaving, setDiscordSaving] = useState(false);
+  const [discordTesting, setDiscordTesting] = useState<string | null>(null);
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     setNameDraft(displayName ?? "");
   }, [displayName]);
+
+  useEffect(() => {
+    setTelegramEnabledDraft(telegramNotificationsEnabled);
+    setTelegramTimeDraft(telegramDailyTime || "08:00");
+    setTelegramTimezoneDraft(telegramTimezone || "Asia/Bangkok");
+  }, [telegramNotificationsEnabled, telegramDailyTime, telegramTimezone]);
 
   useEffect(() => {
     setOrgNameDraft(organizationName);
@@ -101,6 +130,31 @@ export function SettingsPageClient() {
   useEffect(() => {
     setMergeSourceWorkspace("");
   }, [workspaceId]);
+
+  useEffect(() => {
+    if (!supabase || !workspaceId || !session?.user) {
+      setDiscordChannels([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from("workspace_discord_channels")
+        .select("id, channel_name, webhook_url, is_enabled")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      if (error) {
+        toast.error(error.message);
+        setDiscordChannels([]);
+        return;
+      }
+      setDiscordChannels((data ?? []) as DiscordChannelRow[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, workspaceId, session?.user]);
 
   useEffect(() => {
     if (!supabase || !session?.user || !canAccessAdmin) return;
@@ -143,6 +197,61 @@ export function SettingsPageClient() {
     toast.success("บันทึกโปรไฟล์แล้ว");
     await refreshProfile();
     setSavingProfile(false);
+  };
+
+  const saveTelegramSettings = async () => {
+    if (!supabase || !session?.user) return;
+    setSavingTelegram(true);
+    const hhmm = /^\d{2}:\d{2}$/.test(telegramTimeDraft)
+      ? telegramTimeDraft
+      : "08:00";
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        telegram_notifications_enabled: telegramEnabledDraft,
+        telegram_daily_time: hhmm,
+        telegram_timezone: telegramTimezoneDraft || "Asia/Bangkok",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", session.user.id);
+
+    if (error) {
+      toast.error(error.message);
+      setSavingTelegram(false);
+      return;
+    }
+    toast.success("บันทึกการแจ้งเตือน Telegram แล้ว");
+    await refreshProfile();
+    setSavingTelegram(false);
+  };
+
+  const connectTelegram = async () => {
+    if (!supabase || !session?.user) return;
+    setLinkingTelegram(true);
+    const { data, error } = await supabase.rpc("issue_telegram_link_token", {
+      p_ttl_minutes: 30,
+    });
+    if (error || !data) {
+      toast.error(error?.message || "สร้างโค้ดเชื่อมต่อไม่สำเร็จ");
+      setLinkingTelegram(false);
+      return;
+    }
+    const token = String(data);
+    const botUsername =
+      process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.trim() || "";
+    if (!botUsername) {
+      toast.info(
+        `ตั้งค่า NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ก่อน แล้วส่งคำสั่งนี้ให้บอท: /start ${token}`
+      );
+      setLinkingTelegram(false);
+      return;
+    }
+    const deepLink = `https://t.me/${botUsername}?start=${encodeURIComponent(token)}`;
+    if (typeof window !== "undefined") {
+      window.open(deepLink, "_blank", "noopener,noreferrer");
+    }
+    toast.success("เปิด Telegram เพื่อยืนยันการเชื่อมต่อแล้ว");
+    setLinkingTelegram(false);
   };
 
   const saveOrganization = async () => {
@@ -255,6 +364,106 @@ export function SettingsPageClient() {
     await refreshWorkspace();
   };
 
+  const refreshDiscordChannels = async () => {
+    if (!supabase || !workspaceId) return;
+    const { data, error } = await supabase
+      .from("workspace_discord_channels")
+      .select("id, channel_name, webhook_url, is_enabled")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: true });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setDiscordChannels((data ?? []) as DiscordChannelRow[]);
+  };
+
+  const addDiscordChannel = async () => {
+    if (!supabase || !workspaceId) return;
+    const channelName = discordChannelNameDraft.trim();
+    const webhookUrl = discordWebhookDraft.trim();
+    if (!channelName || !webhookUrl) {
+      toast.error("กรอกชื่อห้องและ webhook URL ให้ครบ");
+      return;
+    }
+    setDiscordSaving(true);
+    const { error } = await supabase.from("workspace_discord_channels").insert({
+      workspace_id: workspaceId,
+      channel_name: channelName,
+      webhook_url: webhookUrl,
+      is_enabled: true,
+      created_by: session?.user?.id ?? null,
+      updated_at: new Date().toISOString(),
+    });
+    setDiscordSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setDiscordChannelNameDraft("");
+    setDiscordWebhookDraft("");
+    toast.success("เพิ่ม Discord channel แล้ว");
+    await refreshDiscordChannels();
+  };
+
+  const toggleDiscordChannel = async (id: string, enabled: boolean) => {
+    if (!supabase) return;
+    setDiscordBusyId(id);
+    const { error } = await supabase
+      .from("workspace_discord_channels")
+      .update({ is_enabled: enabled, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    setDiscordBusyId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await refreshDiscordChannels();
+  };
+
+  const removeDiscordChannel = async (id: string) => {
+    if (!supabase) return;
+    setDiscordBusyId(id);
+    const { error } = await supabase
+      .from("workspace_discord_channels")
+      .delete()
+      .eq("id", id);
+    setDiscordBusyId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("ลบ Discord channel แล้ว");
+    await refreshDiscordChannels();
+  };
+
+  const sendDiscordTest = async (channelId: string) => {
+    setDiscordTesting(channelId);
+    try {
+      const response = await fetch("/api/discord/test-daily", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          workspaceId,
+          channelId,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (!response.ok || !payload.ok) {
+        toast.error(payload.error || "ส่งข้อความทดสอบไม่สำเร็จ");
+        return;
+      }
+      toast.success("ส่งข้อความทดสอบไป Discord แล้ว");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ส่งทดสอบไม่สำเร็จ");
+    } finally {
+      setDiscordTesting(null);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-10">
       <div>
@@ -331,6 +540,102 @@ export function SettingsPageClient() {
                   ออกจากระบบ
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Telegram Notifications</CardTitle>
+              <CardDescription>
+                รับสรุปงานรายวันผ่าน DM โดยส่งตาม owner ของงานในแต่ละ workspace
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+                <p className="font-medium">
+                  สถานะการเชื่อมต่อ:{" "}
+                  <span className={telegramChatId ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-300"}>
+                    {telegramChatId ? "เชื่อมต่อแล้ว" : "ยังไม่เชื่อมต่อ"}
+                  </span>
+                </p>
+                {telegramUsername ? (
+                  <p className="mt-1 text-muted-foreground">
+                    Telegram username: @{telegramUsername}
+                  </p>
+                ) : null}
+                {telegramChatId ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    chat id: {telegramChatId}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <Label>เชื่อมต่อบัญชี Telegram</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void connectTelegram()}
+                  disabled={linkingTelegram}
+                  className="gap-2"
+                >
+                  <MaterialIcon name="send" size={16} />
+                  {linkingTelegram ? "กำลังสร้างลิงก์…" : "เชื่อมต่อ Telegram"}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="telegram-enabled">เปิดแจ้งเตือนรายวัน</Label>
+                <Select
+                  value={telegramEnabledDraft ? "on" : "off"}
+                  onValueChange={(v) => setTelegramEnabledDraft(v === "on")}
+                >
+                  <SelectTrigger id="telegram-enabled" className="w-full sm:max-w-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="on">เปิด</SelectItem>
+                    <SelectItem value="off">ปิด</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="telegram-time">เวลาแจ้งเตือนรายวัน</Label>
+                  <Input
+                    id="telegram-time"
+                    type="time"
+                    value={telegramTimeDraft}
+                    onChange={(e) => setTelegramTimeDraft(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telegram-timezone">Timezone</Label>
+                  <Select
+                    value={telegramTimezoneDraft}
+                    onValueChange={(v) =>
+                      setTelegramTimezoneDraft(v || "Asia/Bangkok")
+                    }
+                  >
+                    <SelectTrigger id="telegram-timezone">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Asia/Bangkok">Asia/Bangkok</SelectItem>
+                      <SelectItem value="Asia/Singapore">Asia/Singapore</SelectItem>
+                      <SelectItem value="Asia/Jakarta">Asia/Jakarta</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => void saveTelegramSettings()}
+                disabled={savingTelegram}
+              >
+                {savingTelegram ? "กำลังบันทึก…" : "บันทึก Telegram Notifications"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -593,6 +898,123 @@ export function SettingsPageClient() {
                       </div>
                     </div>
                   ) : null}
+                  <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                    <p className="text-sm font-medium">Discord Daily Summary</p>
+                    <p className="text-xs text-muted-foreground">
+                      ส่งสรุปความคืบหน้ารายวันไปหลายห้อง Discord ของ workspace นี้
+                    </p>
+                    {isWorkspaceAdmin ? (
+                      <>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="discord-channel-name">ชื่อห้อง</Label>
+                            <Input
+                              id="discord-channel-name"
+                              placeholder="เช่น #content-daily"
+                              value={discordChannelNameDraft}
+                              onChange={(e) =>
+                                setDiscordChannelNameDraft(e.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="discord-webhook-url">Webhook URL</Label>
+                            <Input
+                              id="discord-webhook-url"
+                              placeholder="https://discord.com/api/webhooks/..."
+                              value={discordWebhookDraft}
+                              onChange={(e) => setDiscordWebhookDraft(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={discordSaving}
+                          onClick={() => void addDiscordChannel()}
+                        >
+                          {discordSaving ? "กำลังเพิ่ม…" : "เพิ่มห้อง Discord"}
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        เฉพาะแอดมิน workspace เท่านั้นที่จัดการ Discord channels ได้
+                      </p>
+                    )}
+
+                    <ul className="divide-y rounded-lg border text-sm">
+                      {discordChannels.length ? (
+                        discordChannels.map((channel) => (
+                          <li
+                            key={channel.id}
+                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-medium">{channel.channel_name}</p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {channel.webhook_url}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {isWorkspaceAdmin ? (
+                                <Select
+                                  value={channel.is_enabled ? "enabled" : "disabled"}
+                                  onValueChange={(v) =>
+                                    void toggleDiscordChannel(
+                                      channel.id,
+                                      v === "enabled"
+                                    )
+                                  }
+                                  disabled={discordBusyId === channel.id}
+                                >
+                                  <SelectTrigger className="h-8 min-w-28">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="enabled">เปิด</SelectItem>
+                                    <SelectItem value="disabled">ปิด</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <span className="rounded-md bg-muted px-2 py-0.5 text-xs">
+                                  {channel.is_enabled ? "เปิด" : "ปิด"}
+                                </span>
+                              )}
+                              {isWorkspaceAdmin ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={discordTesting === channel.id}
+                                    onClick={() => void sendDiscordTest(channel.id)}
+                                  >
+                                    {discordTesting === channel.id
+                                      ? "กำลังส่ง…"
+                                      : "Send test now"}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-destructive hover:text-destructive"
+                                    disabled={discordBusyId === channel.id}
+                                    onClick={() => void removeDiscordChannel(channel.id)}
+                                  >
+                                    ลบ
+                                  </Button>
+                                </>
+                              ) : null}
+                            </div>
+                          </li>
+                        ))
+                      ) : (
+                        <li className="px-3 py-2 text-muted-foreground">
+                          ยังไม่มี Discord channel ใน workspace นี้
+                        </li>
+                      )}
+                    </ul>
+                  </div>
                   <div>
                     <p className="mb-2 text-sm font-medium">
                       สมาชิกปัจจุบัน ({workspaceMembers.length})

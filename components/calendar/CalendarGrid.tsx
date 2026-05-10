@@ -28,19 +28,20 @@ import Link from "next/link";
 import { calculateDeadlines, resolveSLAKey } from "@/lib/utils";
 import { useContentStore } from "@/store/contentStore";
 import { toast } from "sonner";
+import type { CalendarEvent } from "@/lib/calendarEvents";
 
 function dayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export function CalendarGrid({
-  items,
+  events,
   month,
   onMonthChange,
   onOpenChip,
   draggable,
 }: {
-  items: ContentItem[];
+  events: CalendarEvent[];
   month: Date;
   onMonthChange: (d: Date) => void;
   onOpenChip: (item: ContentItem) => void;
@@ -60,24 +61,27 @@ export function CalendarGrid({
   );
 
   // Build O(n) map from day-key → items, instead of O(n*m) filter per cell.
-  const itemsByDay = useMemo(() => {
-    const map = new Map<string, ContentItem[]>();
-    items.forEach((item) => {
-      const key = dayKey(new Date(item.publishDate));
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    events.forEach((event) => {
+      const key = dayKey(new Date(event.date));
       const arr = map.get(key) ?? [];
-      arr.push(item);
+      arr.push(event);
       map.set(key, arr);
     });
     return map;
-  }, [items]);
+  }, [events]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
+  const handleDragEnd = (dragEvent: DragEndEvent) => {
+    const { active, over } = dragEvent;
     if (!over || typeof over.id !== "string") return;
     const m = /^day-(\d{4}-\d{2}-\d{2})$/.exec(over.id);
     if (!m) return;
     const itemId = String(active.id);
-    const item = items.find((i) => i.id === itemId);
+    const publishEvent = events.find(
+      (entry) => entry.kind === "publish" && entry.item.id === itemId
+    );
+    const item = publishEvent?.item;
     if (!item) return;
     const [yy, mm, dd] = m[1].split("-").map(Number);
     const nextPublish = new Date(yy, mm - 1, dd, 12, 0, 0);
@@ -146,7 +150,7 @@ export function CalendarGrid({
             {w}
           </div>
         ))}
-        {items.length === 0 ? (
+        {events.length === 0 ? (
           <div className="col-span-7 border-r border-b bg-background">
             <EmptyState
               compact
@@ -164,13 +168,13 @@ export function CalendarGrid({
           </div>
         ) : (
           days.map((day) => {
-            const dayItems = itemsByDay.get(dayKey(day)) ?? [];
+            const dayEvents = eventsByDay.get(dayKey(day)) ?? [];
             return (
               <CalendarDayCell
                 key={format(day, "yyyy-MM-dd")}
                 day={day}
                 currentMonth={month}
-                items={dayItems}
+                events={dayEvents}
                 onOpenChip={onOpenChip}
                 draggable={draggable}
               />

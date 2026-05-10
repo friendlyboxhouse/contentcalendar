@@ -35,6 +35,11 @@ import { EmptyState } from "@/components/ui/feedback/EmptyState";
 import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
 import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
+import {
+  buildCalendarEvents,
+  CALENDAR_EVENT_META,
+  type CalendarMode,
+} from "@/lib/calendarEvents";
 
 export function CalendarPageClient() {
   const hydrated = useContentStoreHydrated();
@@ -45,6 +50,7 @@ export function CalendarPageClient() {
   const [month, setMonth] = useState(() => new Date());
   const [selected, setSelected] = useState<ContentItem | null>(null);
   const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("scheduled");
   const [filters, setFilters] = useState<PlannerFilters>({
     pillar: "all",
     platform: "all",
@@ -66,29 +72,66 @@ export function CalendarPageClient() {
     return () => mq.removeEventListener("change", fn);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem("cp-calendar-mode");
+    if (
+      saved === "planned" ||
+      saved === "scheduled" ||
+      saved === "workflow"
+    ) {
+      setCalendarMode(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("cp-calendar-mode", calendarMode);
+  }, [calendarMode]);
+
   const filtered = useMemo(
     () => filterContentItems(items, filters),
     [items, filters]
   );
 
+  const events = useMemo(
+    () => buildCalendarEvents(filtered, calendarMode),
+    [filtered, calendarMode]
+  );
+
   const monthFiltered = useMemo(() => {
     const y = month.getFullYear();
     const m = month.getMonth();
-    return filtered.filter((item) => {
-      const d = new Date(item.publishDate);
+    return events.filter((event) => {
+      const d = new Date(event.date);
       return d.getFullYear() === y && d.getMonth() === m;
     });
-  }, [filtered, month]);
+  }, [events, month]);
 
-  const listSorted = useMemo(
-    () =>
-      [...filtered].sort(
+  const listRows = useMemo(() => {
+    if (calendarMode === "workflow") {
+      return [...events]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map((event) => ({
+          key: event.id,
+          item: event.item,
+          date: event.date,
+          kind: event.kind,
+        }));
+    }
+    return [...events]
+      .map((event) => event.item)
+      .sort(
         (a, b) =>
-          new Date(a.publishDate).getTime() -
-          new Date(b.publishDate).getTime()
-      ),
-    [filtered]
-  );
+          new Date(a.publishDate).getTime() - new Date(b.publishDate).getTime()
+      )
+      .map((item) => ({
+        key: item.id,
+        item,
+        date: item.publishDate,
+        kind: "publish" as const,
+      }));
+  }, [events, calendarMode]);
 
   if (!hydrated || workspaceLoading || !contentSyncedOnce) {
     return (
@@ -139,15 +182,47 @@ export function CalendarPageClient() {
           options={["pillar", "platform", "status", "format"]}
         />
         <ActiveFilterChips filters={filters} onChange={setFilters} />
+        <div className="inline-flex w-full max-w-xl flex-wrap rounded-lg border bg-muted p-1">
+          <Button
+            type="button"
+            size="sm"
+            variant={calendarMode === "planned" ? "default" : "ghost"}
+            className="h-8 gap-1.5"
+            onClick={() => setCalendarMode("planned")}
+          >
+            <MaterialIcon name="lightbulb" size={16} />
+            วางแผน
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={calendarMode === "scheduled" ? "default" : "ghost"}
+            className="h-8 gap-1.5"
+            onClick={() => setCalendarMode("scheduled")}
+          >
+            <MaterialIcon name="schedule" size={16} />
+            กำหนดลง
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={calendarMode === "workflow" ? "default" : "ghost"}
+            className="h-8 gap-1.5"
+            onClick={() => setCalendarMode("workflow")}
+          >
+            <MaterialIcon name="timeline" size={16} />
+            Deadline Timeline
+          </Button>
+        </div>
       </div>
 
       {view === "calendar" && !narrow ? (
         <CalendarGrid
-          items={monthFiltered}
+          events={monthFiltered}
           month={month}
           onMonthChange={setMonth}
           onOpenChip={setSelected}
-          draggable={canDragCalendar}
+          draggable={canDragCalendar && calendarMode !== "workflow"}
         />
       ) : (
         <div className="rounded-xl border bg-card shadow-sm">
@@ -161,19 +236,24 @@ export function CalendarPageClient() {
                 <TableHead>Platform</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Owner</TableHead>
-                <TableHead>Publish</TableHead>
+                {calendarMode === "workflow" ? (
+                  <TableHead>Milestone</TableHead>
+                ) : null}
+                <TableHead>{calendarMode === "workflow" ? "Date" : "Publish"}</TableHead>
                 <TableHead>Countdown</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {listSorted.map((item) => (
-                <TableRow
-                  key={item.id}
-                  style={{
-                    backgroundColor: `color-mix(in srgb, ${PILLAR_CONFIG[item.pillar].bgColor} 45%, transparent)`,
-                  }}
-                >
+              {listRows.map((row) => {
+                const item = row.item;
+                return (
+                  <TableRow
+                    key={row.key}
+                    style={{
+                      backgroundColor: `color-mix(in srgb, ${PILLAR_CONFIG[item.pillar].color} 12%, var(--background))`,
+                    }}
+                  >
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {item.id}
                   </TableCell>
@@ -200,11 +280,23 @@ export function CalendarPageClient() {
                     />
                   </TableCell>
                   <TableCell>{item.owner}</TableCell>
+                  {calendarMode === "workflow" ? (
+                    <TableCell className="text-xs font-medium">
+                      <span className="inline-flex items-center gap-1.5">
+                        <MaterialIcon
+                          name={CALENDAR_EVENT_META[row.kind].iconName}
+                          size={14}
+                          className="text-muted-foreground"
+                        />
+                        {CALENDAR_EVENT_META[row.kind].label}
+                      </span>
+                    </TableCell>
+                  ) : null}
                   <TableCell className="whitespace-nowrap text-xs">
-                    {new Date(item.publishDate).toLocaleDateString("th-TH")}
+                    {new Date(row.date).toLocaleDateString("th-TH")}
                   </TableCell>
                   <TableCell>
-                    <CountdownTimer targetDate={item.publishDate} compact />
+                    <CountdownTimer targetDate={row.date} compact />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
@@ -254,10 +346,11 @@ export function CalendarPageClient() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
-          {!listSorted.length ? (
+          {!listRows.length ? (
             <EmptyState
               compact
               icon="filter_alt_off"

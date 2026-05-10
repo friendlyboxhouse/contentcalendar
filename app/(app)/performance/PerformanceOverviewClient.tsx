@@ -237,7 +237,10 @@ export function PerformanceOverviewClient() {
                     : "—"}
                 </p>
                 {pendingKpi ? (
-                  <Badge variant="secondary" className="w-fit bg-amber-100 text-amber-900">
+                  <Badge
+                    variant="secondary"
+                    className="w-fit bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100"
+                  >
                     รอรีวิว KPI
                   </Badge>
                 ) : total ? (
@@ -245,8 +248,8 @@ export function PerformanceOverviewClient() {
                     variant="secondary"
                     className={
                       passed === total
-                        ? "bg-emerald-100 text-emerald-900"
-                        : "bg-amber-100 text-amber-900"
+                        ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100"
+                        : "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100"
                     }
                   >
                     KPI {passed}/{total}

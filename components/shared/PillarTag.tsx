@@ -31,8 +31,8 @@ export function PillarTag({
         className
       )}
       style={{
-        backgroundColor: config.bgColor,
-        color: config.color,
+        backgroundColor: `color-mix(in srgb, ${config.color} 18%, var(--background))`,
+        color: `color-mix(in oklab, ${config.color} 80%, var(--foreground))`,
         borderLeft: `3px solid ${config.color}`,
       }}
     >

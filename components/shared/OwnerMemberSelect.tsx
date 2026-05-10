@@ -9,24 +9,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import {
+  memberLabel,
+  ownerStoredFromMember,
+} from "@/lib/ownerMapping";
 
-export function memberLabel(m: WorkspaceMemberRow): string {
-  const name = m.display_name?.trim();
-  const em = m.email?.trim();
-  if (name && em) return `${name} (${em})`;
-  if (name) return name;
-  if (em) return em;
-  return m.user_id.slice(0, 8) + "…";
-}
-
-/** ค่าที่เก็บใน ContentItem.owner เวลาเลือกจากทีม — normalize เพื่อลด typo */
-export function ownerStoredFromMember(m: WorkspaceMemberRow): string {
-  const dn = m.display_name?.trim();
-  if (dn) return dn;
-  const em = m.email?.trim();
-  if (em) return em;
-  return memberLabel(m);
-}
+export { memberLabel, ownerStoredFromMember };
 
 export function OwnerMemberSelect({
   members,

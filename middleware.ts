@@ -49,6 +49,10 @@ export async function middleware(request: NextRequest) {
   const nextParam = `${pathname}${request.nextUrl.search}`;
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/auth");
+  const isPublicIntegrationRoute =
+    pathname === "/api/telegram/webhook" ||
+    pathname === "/api/cron/telegram-daily" ||
+    pathname === "/api/cron/discord-daily";
 
   const withNoStore = (res: NextResponse) => {
     /**
@@ -64,6 +68,10 @@ export async function middleware(request: NextRequest) {
     res.headers.set("x-cp-middleware", "1");
     return res;
   };
+
+  if (isPublicIntegrationRoute) {
+    return withNoStore(NextResponse.next());
+  }
 
   /**
    * ไม่มี Supabase env:
