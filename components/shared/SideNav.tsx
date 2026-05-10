@@ -138,7 +138,8 @@ export function SideNav() {
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
                   "xl:py-2",
-                  "max-xl:justify-center max-xl:px-2 max-xl:rounded-lg",
+                  /* แถบแคบ (จอกว้างต่ำกว่า xl): ซ้อนไอคอน + ชื่อย่อใต้ไอคอนให้พอดี w-[72px] */
+                  "max-xl:flex-col max-xl:items-center max-xl:justify-center max-xl:gap-1 max-xl:px-2 max-xl:rounded-lg max-xl:py-2",
                   "max-md:flex max-md:min-h-[52px] max-md:min-w-[44px] max-md:flex-1 max-md:flex-col max-md:justify-center max-md:gap-1 max-md:px-1 max-md:py-2",
                   active
                     ? "bg-primary text-primary-foreground shadow-sm"
@@ -147,7 +148,8 @@ export function SideNav() {
               >
                 <MaterialIcon name={symbol} className="shrink-0" size={24} />
                 <span className="hidden xl:inline">{label}</span>
-                <span className="hidden max-md:block max-w-[4.25rem] truncate text-center text-[11px] font-semibold leading-tight xl:hidden">
+                {/* ชื่อย่อ: มือถือ (แถบล่าง) + แท็บเล็ต/จอแคบ (ไซด์ไอคอน) — เดิมมีแค่ max-md เลยหายช่วง md–xl */}
+                <span className="block max-w-[4.5rem] truncate text-center text-[10px] font-semibold leading-tight xl:hidden max-md:text-[11px] max-md:max-w-[4.25rem]">
                   {mobileLabel}
                 </span>
               </Link>
