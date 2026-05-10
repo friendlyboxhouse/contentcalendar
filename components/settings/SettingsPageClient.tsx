@@ -519,7 +519,10 @@ export function SettingsPageClient() {
                         <SelectContent>
                           {workspaces.map((w) => (
                             <SelectItem key={w.id} value={w.id}>
-                              {w.name} ({w.role})
+                              <span className="truncate">{w.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                ({w.role})
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -654,7 +657,7 @@ export function SettingsPageClient() {
                                   memberActionBusy === `role:${m.user_id}`
                                 }
                               >
-                                <SelectTrigger className="h-8 w-28">
+                                <SelectTrigger className="h-8 min-w-28 w-full">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>

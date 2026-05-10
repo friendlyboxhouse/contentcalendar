@@ -63,7 +63,7 @@ export function SLAPresetPicker({
 
       <Card className="border-0 bg-slate-50 dark:bg-slate-900/40">
         <CardContent className="space-y-2 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Deadline Timeline · {sla.emoji} {sla.label}
           </p>
           {[

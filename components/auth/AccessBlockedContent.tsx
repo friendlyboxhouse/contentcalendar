@@ -64,7 +64,10 @@ export function AccessBlockedContent() {
       <Card className="w-full max-w-md shadow-md">
         <CardHeader>
           <CardTitle className="flex items-start gap-2 text-lg">
-            <MaterialIcon name="gpp_maybe" className="shrink-0 text-amber-600" />
+            <MaterialIcon
+              name="gpp_maybe"
+              className="shrink-0 text-amber-600 dark:text-amber-400"
+            />
             {message.title}
           </CardTitle>
           <CardDescription className="text-base leading-relaxed text-foreground/90">

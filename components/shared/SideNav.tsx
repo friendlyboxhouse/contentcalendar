@@ -103,6 +103,8 @@ export function SideNav() {
         ] as const)
       : []),
   ];
+  const activeWorkspace = workspaces.find((w) => w.id === workspaceId) ?? workspaces[0];
+  const workspaceBadge = (activeWorkspace?.name?.trim()?.charAt(0) ?? "W").toUpperCase();
 
   return (
     <aside
@@ -162,6 +164,7 @@ export function SideNav() {
             <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               <MaterialIcon name="groups" size={14} className="xl:hidden" />
               <span className="max-xl:hidden">Workspace</span>
+              <span className="hidden xl:hidden max-xl:inline">WS</span>
             </p>
             <Select
               value={workspaceId ?? ""}
@@ -170,10 +173,13 @@ export function SideNav() {
               }}
             >
               <SelectTrigger
-                className="h-9 w-full bg-sidebar-accent/40 max-xl:w-10 max-xl:justify-center max-xl:px-2"
+                className="h-9 w-full bg-sidebar-accent/40 max-xl:w-full max-xl:justify-center max-xl:px-2"
                 title="เลือก workspace"
               >
-                <MaterialIcon name="groups" size={16} className="xl:hidden" />
+                <MaterialIcon name="groups" size={16} className="max-xl:hidden" />
+                <span className="hidden h-5 min-w-5 items-center justify-center rounded-full bg-sidebar/70 px-1 text-[10px] font-semibold text-sidebar-foreground max-xl:inline-flex">
+                  {workspaceBadge}
+                </span>
                 <SelectValue
                   className="max-xl:hidden"
                   placeholder="เลือก workspace"
@@ -182,7 +188,8 @@ export function SideNav() {
               <SelectContent>
                 {workspaces.map((w) => (
                   <SelectItem key={w.id} value={w.id}>
-                    {w.name} ({w.role})
+                    <span className="truncate">{w.name}</span>
+                    <span className="text-xs text-muted-foreground">({w.role})</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -244,9 +251,10 @@ export function SideNav() {
         </Link>
 
         <div className="space-y-3 max-md:hidden">
-          <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground max-xl:hidden">
+          <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <MaterialIcon name="category" size={14} />
-            หมวดคอนเทนต์
+            <span className="max-xl:hidden">หมวดคอนเทนต์</span>
+            <span className="hidden xl:hidden max-xl:inline">หมวด</span>
           </p>
           <ul className="space-y-1.5 max-xl:space-y-2">
             {(Object.keys(PILLAR_CONFIG) as ContentPillar[]).map((key) => {
@@ -262,6 +270,9 @@ export function SideNav() {
                     style={{ backgroundColor: c.color }}
                   />
                   <span className="max-xl:hidden">{c.label}</span>
+                  <span className="hidden max-w-[3.75rem] truncate text-[10px] leading-tight max-xl:inline">
+                    {c.label}
+                  </span>
                 </li>
               );
             })}
@@ -270,11 +281,11 @@ export function SideNav() {
 
         <Collapsible defaultOpen={false} className="max-md:hidden">
           <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-sidebar-accent min-h-10">
-            <span className="flex items-center gap-1 max-xl:hidden">
+            <span className="flex items-center gap-1">
               <MaterialIcon name="flag" size={14} />
-              สถานะ
+              <span className="max-xl:hidden">สถานะ</span>
+              <span className="hidden xl:hidden max-xl:inline">สถานะ</span>
             </span>
-            <MaterialIcon name="flag" size={16} className="opacity-70 xl:hidden" />
             <MaterialIcon name="expand_more" size={18} className="hidden opacity-70 xl:block" />
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-2 space-y-1">
@@ -292,6 +303,9 @@ export function SideNav() {
                   />
                   <span className="max-xl:hidden">
                     {s.emoji} {s.label}
+                  </span>
+                  <span className="hidden max-w-[3.75rem] truncate text-[10px] leading-tight max-xl:inline">
+                    {s.label}
                   </span>
                 </div>
               );
