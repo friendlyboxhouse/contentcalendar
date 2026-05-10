@@ -575,7 +575,7 @@ export function SettingsPageClient() {
         pending_update_count?: number;
         error?: string;
       };
-      setTelegramWebhookInfo(payload);
+      setTelegramWebhookInfo({ ...payload, ok: Boolean(payload.ok) });
       if (!response.ok || !payload.ok) {
         toast.error(payload.error || "โหลดสถานะ Telegram bot ไม่สำเร็จ");
       }
