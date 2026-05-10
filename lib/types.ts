@@ -15,12 +15,7 @@ export type ContentFormat =
   | "story"
   | "ugc";
 
-export type ContentType =
-  | "educational"
-  | "entertaining"
-  | "promotional"
-  | "inspirational"
-  | "ugc";
+export type ContentType = string;
 
 export type Platform =
   | "instagram"

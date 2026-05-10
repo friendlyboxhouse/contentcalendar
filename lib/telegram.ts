@@ -18,12 +18,16 @@ type TelegramSendResult =
   | { ok: true; messageId?: number }
   | { ok: false; error: string; status?: number };
 
-function getTelegramBotToken(): string {
+type TelegramApiResult<T = unknown> =
+  | { ok: true; result: T }
+  | { ok: false; error: string; status?: number };
+
+function getTelegramBotToken(): TelegramApiResult<string> {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
   if (!token) {
-    throw new Error("Missing TELEGRAM_BOT_TOKEN");
+    return { ok: false, error: "Missing TELEGRAM_BOT_TOKEN" };
   }
-  return token;
+  return { ok: true, result: token };
 }
 
 function getTelegramApiBase(): string {
@@ -81,7 +85,8 @@ export async function sendTelegramMessage(
   text: string
 ): Promise<TelegramSendResult> {
   const token = getTelegramBotToken();
-  const endpoint = `${getTelegramApiBase()}/bot${token}/sendMessage`;
+  if (!token.ok) return token;
+  const endpoint = `${getTelegramApiBase()}/bot${token.result}/sendMessage`;
 
   try {
     const response = await fetch(endpoint, {
@@ -113,6 +118,88 @@ export async function sendTelegramMessage(
     return {
       ok: true,
       messageId: payload.result?.message_id,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unknown Telegram error",
+    };
+  }
+}
+
+export async function setTelegramWebhook(input: {
+  webhookUrl: string;
+  secretToken: string;
+}): Promise<TelegramApiResult<{ description?: string }>> {
+  const token = getTelegramBotToken();
+  if (!token.ok) return token;
+  const endpoint = `${getTelegramApiBase()}/bot${token.result}/setWebhook`;
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        url: input.webhookUrl,
+        secret_token: input.secretToken,
+        allowed_updates: ["message"],
+      }),
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | { ok?: boolean; description?: string; result?: { description?: string } }
+      | null;
+    if (!response.ok || !payload?.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        error: payload?.description || `Telegram API error (${response.status})`,
+      };
+    }
+    return { ok: true, result: { description: payload.description } };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unknown Telegram error",
+    };
+  }
+}
+
+export async function getTelegramWebhookInfo(): Promise<
+  TelegramApiResult<{
+    url?: string;
+    pending_update_count?: number;
+    last_error_message?: string;
+  }>
+> {
+  const token = getTelegramBotToken();
+  if (!token.ok) return token;
+  const endpoint = `${getTelegramApiBase()}/bot${token.result}/getWebhookInfo`;
+  try {
+    const response = await fetch(endpoint, { method: "GET" });
+    const payload = (await response.json().catch(() => null)) as
+      | {
+          ok?: boolean;
+          description?: string;
+          result?: {
+            url?: string;
+            pending_update_count?: number;
+            last_error_message?: string;
+          };
+        }
+      | null;
+    if (!response.ok || !payload?.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        error: payload?.description || `Telegram API error (${response.status})`,
+      };
+    }
+    return {
+      ok: true,
+      result: {
+        url: payload.result?.url,
+        pending_update_count: payload.result?.pending_update_count,
+        last_error_message: payload.result?.last_error_message,
+      },
     };
   } catch (error) {
     return {

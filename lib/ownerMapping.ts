@@ -1,3 +1,5 @@
+import { buildUserInitials } from "@/lib/initials";
+
 export type OwnerMemberIdentity = {
   user_id: string;
   display_name: string | null;
@@ -10,7 +12,8 @@ export function memberLabel(m: OwnerMemberIdentity): string {
   if (name && email) return `${name} (${email})`;
   if (name) return name;
   if (email) return email;
-  return m.user_id.slice(0, 8) + "…";
+  const fallback = m.user_id.replace(/-/g, "").slice(0, 2).toUpperCase();
+  return fallback || buildUserInitials(null, null);
 }
 
 export function ownerStoredFromMember(m: OwnerMemberIdentity): string {

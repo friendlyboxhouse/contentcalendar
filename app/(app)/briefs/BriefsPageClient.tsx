@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, Suspense } from "react";
+import { useDeferredValue, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
@@ -38,6 +38,7 @@ import {
 import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
 import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
+import { PageHeader } from "@/components/ui/page-header";
 
 function BriefsInner() {
   const router = useRouter();
@@ -52,6 +53,7 @@ function BriefsInner() {
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [filters, setFilters] = useState<PlannerFilters>({
     pillar: "all",
     platform: "all",
@@ -77,8 +79,8 @@ function BriefsInner() {
     if (fsStatuses?.length) {
       list = list.filter((i) => fsStatuses.includes(i.status));
     }
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
+    if (deferredSearch.trim()) {
+      const q = deferredSearch.trim().toLowerCase();
       list = list.filter(
         (i) =>
           i.topic.toLowerCase().includes(q) ||
@@ -90,7 +92,7 @@ function BriefsInner() {
         new Date(a.publishDate).getTime() -
         new Date(b.publishDate).getTime()
     );
-  }, [items, filters, fsStatuses, search]);
+  }, [items, filters, fsStatuses, deferredSearch]);
 
   if (!hydrated || workspaceLoading || !contentSyncedOnce) {
     return (
@@ -150,22 +152,20 @@ function BriefsInner() {
         </DialogContent>
       </Dialog>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">คอนเทนต์บรีฟ</h1>
-          <p className="text-sm text-muted-foreground">
-            ศูนย์กลางบรีฟ · เชื่อมกับปฏิทินอัตโนมัติ
-          </p>
-        </div>
-        {canEdit ? (
-          <Link href="/briefs/new">
-            <Button size="sm" className="gap-1.5">
-              <MaterialIcon name="add" size={16} />
-              สร้างบรีฟใหม่
-            </Button>
-          </Link>
-        ) : null}
-      </div>
+      <PageHeader
+        title="คอนเทนต์บรีฟ"
+        description="ศูนย์กลางบรีฟ · เชื่อมกับปฏิทินอัตโนมัติ"
+        actions={
+          canEdit ? (
+            <Link href="/briefs/new">
+              <Button size="sm" className="gap-1.5">
+                <MaterialIcon name="add" size={16} />
+                สร้างบรีฟใหม่
+              </Button>
+            </Link>
+          ) : null
+        }
+      />
 
       <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">

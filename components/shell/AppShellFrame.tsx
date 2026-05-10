@@ -1,6 +1,7 @@
 import { SideNav } from "@/components/shared/SideNav";
 import { LocalModeBanner } from "@/components/auth/LocalModeBanner";
 import { KeyboardShortcutsHint } from "@/components/shared/KeyboardShortcutsHint";
+import { AppTopbar } from "@/components/shell/AppTopbar";
 
 /**
  * โครงหลักของแอปหลังเข้าสู่ระบบ — รวมจุดเดียวเพื่อ UX/a11y (skip link, landmark เดียว)
@@ -14,17 +15,18 @@ export function AppShellFrame({ children }: { children: React.ReactNode }) {
       >
         ข้ามไปยังเนื้อหาหลัก
       </a>
-      <SideNav />
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className="min-h-screen bg-muted/30 pl-[240px] transition-[padding] max-xl:pl-[72px] max-md:pb-16 max-md:pl-0 motion-reduce:transition-none"
-      >
-        <div className="mx-auto max-w-6xl p-4 md:p-6">
-          <LocalModeBanner />
-          {children}
+      <div className="min-h-screen bg-muted/30 md:grid md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)]">
+        <SideNav />
+        <div className="min-w-0 transition-[padding] max-md:pb-16 motion-reduce:transition-none">
+          <AppTopbar />
+          <main id="main-content" tabIndex={-1}>
+            <div className="mx-auto max-w-6xl space-y-4 p-4 md:p-6">
+              <LocalModeBanner />
+              {children}
+            </div>
+          </main>
         </div>
-      </main>
+      </div>
       <KeyboardShortcutsHint />
     </>
   );

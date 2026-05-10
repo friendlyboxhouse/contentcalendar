@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useDeferredValue, useMemo, useState, useEffect } from "react";
 import { useContentStore } from "@/store/contentStore";
 import type { ContentItem, PlannerFilters } from "@/lib/types";
 import { FilterBar } from "@/components/shared/FilterBar";
@@ -40,6 +40,7 @@ import {
   CALENDAR_EVENT_META,
   type CalendarMode,
 } from "@/lib/calendarEvents";
+import { PageHeader } from "@/components/ui/page-header";
 
 export function CalendarPageClient() {
   const hydrated = useContentStoreHydrated();
@@ -59,6 +60,7 @@ export function CalendarPageClient() {
   });
 
   const { canDragCalendar, canChangeStatus, canDelete } = usePlannerPermissions();
+  const deferredFilters = useDeferredValue(filters);
 
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
@@ -90,8 +92,8 @@ export function CalendarPageClient() {
   }, [calendarMode]);
 
   const filtered = useMemo(
-    () => filterContentItems(items, filters),
-    [items, filters]
+    () => filterContentItems(items, deferredFilters),
+    [items, deferredFilters]
   );
 
   const events = useMemo(
@@ -143,37 +145,38 @@ export function CalendarPageClient() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">ปฏิทินคอนเทนต์</h1>
-          <p className="text-sm text-muted-foreground">
-            ดูแผนตามวันโพสต์
-            {canDragCalendar ? " · ลากย้ายวันได้ (มุมมองปฏิทิน)" : " · โหมดดูอย่างเดียวไม่สามารถลากหรือแก้ในตารางได้"}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 max-md:hidden">
-          <div className="inline-flex rounded-lg border bg-muted p-1">
-            <Button
-              type="button"
-              size="sm"
-              variant={view === "calendar" ? "default" : "ghost"}
-              className="h-8"
-              onClick={() => setView("calendar")}
-            >
-              ปฏิทิน
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={view === "list" ? "default" : "ghost"}
-              className="h-8"
-              onClick={() => setView("list")}
-            >
-              รายการ
-            </Button>
+      <PageHeader
+        title="ปฏิทินคอนเทนต์"
+        description={
+          canDragCalendar
+            ? "ดูแผนตามวันโพสต์ · ลากย้ายวันได้ (มุมมองปฏิทิน)"
+            : "ดูแผนตามวันโพสต์ · โหมดดูอย่างเดียวไม่สามารถลากหรือแก้ในตารางได้"
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2 max-md:hidden">
+            <div className="inline-flex rounded-lg border bg-muted p-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={view === "calendar" ? "default" : "ghost"}
+                className="h-8"
+                onClick={() => setView("calendar")}
+              >
+                ปฏิทิน
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={view === "list" ? "default" : "ghost"}
+                className="h-8"
+                onClick={() => setView("list")}
+              >
+                รายการ
+              </Button>
+            </div>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="space-y-2">
         <FilterBar

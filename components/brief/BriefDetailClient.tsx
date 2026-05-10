@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -74,6 +75,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useContentTypes } from "@/hooks/useContentTypes";
+
+const RevisionHistoryCard = dynamic(
+  () =>
+    import("@/components/brief/RevisionHistoryCard").then(
+      (mod) => mod.RevisionHistoryCard
+    ),
+  { ssr: false }
+);
 
 const APPROVAL_ROLE_LABELS: Record<ApprovalTrackRow["role"], string> = {
   creative_lead: "Creative Lead",
@@ -121,6 +131,7 @@ export function BriefDetailClient({ briefId }: Props) {
   } = useSupabaseApp();
   const { canEdit } = usePlannerPermissions();
   const hydrated = useContentStoreHydrated();
+  const { activeItems: contentTypes } = useContentTypes();
 
   const isNew = !briefId;
   const seedNewRef = useRef<ContentItem | null>(null);
@@ -644,17 +655,9 @@ export function BriefDetailClient({ briefId }: Props) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(
-                    [
-                      "educational",
-                      "entertaining",
-                      "promotional",
-                      "inspirational",
-                      "ugc",
-                    ] as ContentType[]
-                  ).map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
+                  {contentTypes.map((t) => (
+                    <SelectItem key={t.id} value={t.slug}>
+                      {t.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1001,70 +1004,15 @@ export function BriefDetailClient({ briefId }: Props) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <MaterialIcon name="history_edu" size={18} />
-              Revision history
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2 sm:grid-cols-[auto_1fr_auto]">
-              <Select
-                value={revRound}
-                disabled={!canEdit}
-                onValueChange={(v) => setRevRound(v as RevisionRound)}
-              >
-                <SelectTrigger className="w-[88px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(["R1", "R2", "R3+"] as RevisionRound[]).map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                placeholder="บันทึกสิ่งที่ต้องแก้ / feedback"
-                value={revNote}
-                disabled={!canEdit}
-                onChange={(e) => setRevNote(e.target.value)}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!canEdit}
-                className="gap-1"
-                onClick={addRevisionEntry}
-              >
-                <MaterialIcon name="add_comment" size={18} />
-                เพิ่ม
-              </Button>
-            </div>
-            <Separator />
-            <ul className="max-h-60 space-y-3 overflow-y-auto text-sm">
-              {[...(draft.revisionHistory ?? [])]
-                .sort(
-                  (a, b) =>
-                    new Date(b.date).getTime() - new Date(a.date).getTime()
-                )
-                .map((h, i) => (
-                  <li key={`${h.date.toString()}-${i}`} className="rounded-md border bg-muted/40 px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">{h.round}</span>
-                      <span>{format(new Date(h.date), "dd MMM yyyy HH:mm")}</span>
-                    </div>
-                    <p className="mt-1 whitespace-pre-wrap">{h.note}</p>
-                  </li>
-                ))}
-              {!(draft.revisionHistory?.length) && (
-                <li className="text-xs text-muted-foreground">ยังไม่มีประวัติ revision</li>
-              )}
-            </ul>
-          </CardContent>
-        </Card>
+        <RevisionHistoryCard
+          canEdit={canEdit}
+          revRound={revRound}
+          revNote={revNote}
+          history={draft.revisionHistory ?? []}
+          onRoundChange={setRevRound}
+          onNoteChange={setRevNote}
+          onAdd={addRevisionEntry}
+        />
       </div>
 
       <Card>

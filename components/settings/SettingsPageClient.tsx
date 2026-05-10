@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -30,6 +31,16 @@ import {
 } from "@/components/supabase/SupabaseAppProvider";
 import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
 import { cn } from "@/lib/utils";
+import { useContentTypes } from "@/hooks/useContentTypes";
+import { buildUserInitials } from "@/lib/initials";
+import { Avatar } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 const ROLE_HELP: Record<PlannerRole, { title: string; body: string }> = {
   viewer: {
     title: "ผู้ดู",
@@ -52,28 +63,14 @@ type DiscordChannelRow = {
   is_enabled: boolean;
 };
 
-function openTelegramAppLink(botUsername: string, token: string) {
-  if (typeof window === "undefined") return;
-
+function buildTelegramLinks(botUsername: string, token: string) {
   const username = botUsername.replace(/^@/, "");
   const encodedUsername = encodeURIComponent(username);
   const encodedToken = encodeURIComponent(token);
-  const appLink = `tg://resolve?domain=${encodedUsername}&start=${encodedToken}`;
-  const webLink = `https://t.me/${encodedUsername}?start=${encodedToken}`;
-  let openedApp = false;
-
-  const markOpened = () => {
-    openedApp = true;
+  return {
+    appLink: `tg://resolve?domain=${encodedUsername}&start=${encodedToken}`,
+    webLink: `https://t.me/${encodedUsername}?start=${encodedToken}`,
   };
-  window.addEventListener("blur", markOpened, { once: true });
-  document.addEventListener("visibilitychange", markOpened, { once: true });
-
-  window.location.href = appLink;
-  window.setTimeout(() => {
-    window.removeEventListener("blur", markOpened);
-    document.removeEventListener("visibilitychange", markOpened);
-    if (!openedApp) window.location.href = webLink;
-  }, 1200);
 }
 
 export function SettingsPageClient() {
@@ -90,6 +87,8 @@ export function SettingsPageClient() {
     refreshWorkspace,
     canAccessAdmin,
     displayName,
+    avatarUrl,
+    avatarColor,
     telegramChatId,
     telegramUsername,
     telegramNotificationsEnabled,
@@ -104,6 +103,12 @@ export function SettingsPageClient() {
   } = useSupabaseApp();
 
   const { isWorkspaceAdmin } = usePlannerPermissions();
+  const {
+    items: contentTypeRows,
+    activeItems: activeContentTypes,
+    loading: contentTypeLoading,
+    refresh: refreshContentTypes,
+  } = useContentTypes();
 
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -134,6 +139,46 @@ export function SettingsPageClient() {
   const [discordSaving, setDiscordSaving] = useState(false);
   const [discordTesting, setDiscordTesting] = useState<string | null>(null);
 
+  const [telegramPopupOpen, setTelegramPopupOpen] = useState(false);
+  const [telegramToken, setTelegramToken] = useState<string | null>(null);
+  const [telegramAppLink, setTelegramAppLink] = useState<string>("");
+  const [telegramWebLink, setTelegramWebLink] = useState<string>("");
+  const [telegramWebhookInfo, setTelegramWebhookInfo] = useState<{
+    ok: boolean;
+    url?: string;
+    last_error_message?: string;
+    pending_update_count?: number;
+    error?: string;
+  } | null>(null);
+  const [telegramWebhookBusy, setTelegramWebhookBusy] = useState(false);
+
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [newWorkspaceSlug, setNewWorkspaceSlug] = useState("");
+  const [workspaceBusy, setWorkspaceBusy] = useState(false);
+  const [workspaceRenameDraft, setWorkspaceRenameDraft] = useState("");
+  const [workspaceSlugDraft, setWorkspaceSlugDraft] = useState("");
+  const [inviteLink, setInviteLink] = useState("");
+
+  const [ctLabelDraft, setCtLabelDraft] = useState("");
+  const [ctSlugDraft, setCtSlugDraft] = useState("");
+  const [ctColorDraft, setCtColorDraft] = useState("#5B6CFF");
+  const [contentTypeBusy, setContentTypeBusy] = useState<string | null>(null);
+
+  const [apiKeys, setApiKeys] = useState<
+    Array<{
+      id: string;
+      name: string;
+      prefix: string;
+      scopes: string[];
+      last_used_at: string | null;
+      revoked_at: string | null;
+      created_at: string;
+    }>
+  >([]);
+  const [apiKeyName, setApiKeyName] = useState("");
+  const [apiKeyBusy, setApiKeyBusy] = useState(false);
+  const [newlyIssuedKey, setNewlyIssuedKey] = useState<string | null>(null);
+
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -154,6 +199,20 @@ export function SettingsPageClient() {
   useEffect(() => {
     setMergeSourceWorkspace("");
   }, [workspaceId]);
+
+  const activeWorkspace = useMemo(
+    () => workspaces.find((w) => w.id === workspaceId) ?? null,
+    [workspaces, workspaceId]
+  );
+  const identityInitials = useMemo(
+    () => buildUserInitials(displayName, session?.user?.email ?? null),
+    [displayName, session?.user?.email]
+  );
+
+  useEffect(() => {
+    setWorkspaceRenameDraft(activeWorkspace?.name ?? "");
+    setWorkspaceSlugDraft(activeWorkspace?.slug ?? "");
+  }, [activeWorkspace?.id, activeWorkspace?.name, activeWorkspace?.slug]);
 
   useEffect(() => {
     if (!supabase || !workspaceId || !session?.user) {
@@ -270,8 +329,12 @@ export function SettingsPageClient() {
       setLinkingTelegram(false);
       return;
     }
-    openTelegramAppLink(botUsername, token);
-    toast.success("กำลังเปิด Telegram เพื่อยืนยันการเชื่อมต่อ");
+    const links = buildTelegramLinks(botUsername, token);
+    setTelegramToken(token);
+    setTelegramAppLink(links.appLink);
+    setTelegramWebLink(links.webLink);
+    setTelegramPopupOpen(true);
+    toast.success("สร้างโค้ดเชื่อมต่อแล้ว");
     setLinkingTelegram(false);
   };
 
@@ -485,6 +548,378 @@ export function SettingsPageClient() {
     }
   };
 
+  const openTelegramPopup = () => {
+    if (!telegramAppLink) return;
+    const popup = window.open(
+      telegramAppLink,
+      "telegram-connect",
+      "noopener,noreferrer,width=560,height=760"
+    );
+    window.setTimeout(() => {
+      if (!popup || popup.closed) {
+        window.open(telegramWebLink, "_blank", "noopener,noreferrer");
+      }
+    }, 1200);
+  };
+
+  const loadTelegramWebhookStatus = async () => {
+    setTelegramWebhookBusy(true);
+    try {
+      const response = await fetch("/api/admin/telegram/status", {
+        method: "GET",
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        url?: string;
+        last_error_message?: string;
+        pending_update_count?: number;
+        error?: string;
+      };
+      setTelegramWebhookInfo(payload);
+      if (!response.ok || !payload.ok) {
+        toast.error(payload.error || "โหลดสถานะ Telegram bot ไม่สำเร็จ");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "โหลดสถานะ Telegram bot ไม่สำเร็จ");
+    } finally {
+      setTelegramWebhookBusy(false);
+    }
+  };
+
+  const setupTelegramWebhook = async () => {
+    setTelegramWebhookBusy(true);
+    try {
+      const response = await fetch("/api/admin/telegram/setup-webhook", {
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        result?: { description?: string };
+      };
+      if (!response.ok || !payload.ok) {
+        toast.error(payload.error || "ตั้งค่า Telegram webhook ไม่สำเร็จ");
+        return;
+      }
+      toast.success("ตั้งค่า Telegram webhook แล้ว");
+      await loadTelegramWebhookStatus();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ตั้งค่า Telegram webhook ไม่สำเร็จ");
+    } finally {
+      setTelegramWebhookBusy(false);
+    }
+  };
+
+  const createWorkspace = async () => {
+    if (!supabase || !session?.user) return;
+    const name = newWorkspaceName.trim();
+    if (!name) {
+      toast.error("กรอกชื่อ workspace ก่อน");
+      return;
+    }
+    setWorkspaceBusy(true);
+    const slug = newWorkspaceSlug.trim().toLowerCase() || null;
+    const { data, error } = await supabase
+      .from("workspaces")
+      .insert({
+        name,
+        slug,
+        created_by: session.user.id,
+        updated_at: new Date().toISOString(),
+      })
+      .select("id")
+      .maybeSingle();
+    if (error || !data?.id) {
+      toast.error(error?.message || "สร้าง workspace ไม่สำเร็จ");
+      setWorkspaceBusy(false);
+      return;
+    }
+    const { error: memberError } = await supabase.from("workspace_members").insert({
+      workspace_id: data.id,
+      user_id: session.user.id,
+      role: "admin",
+    });
+    setWorkspaceBusy(false);
+    if (memberError) {
+      toast.error(memberError.message);
+      return;
+    }
+    toast.success("สร้าง workspace ใหม่แล้ว");
+    setNewWorkspaceName("");
+    setNewWorkspaceSlug("");
+    await refreshWorkspace();
+    setActiveWorkspace(data.id);
+  };
+
+  const renameWorkspace = async () => {
+    if (!supabase || !workspaceId) return;
+    const name = workspaceRenameDraft.trim();
+    if (!name) {
+      toast.error("กรอกชื่อ workspace ก่อนบันทึก");
+      return;
+    }
+    setWorkspaceBusy(true);
+    const { error } = await supabase
+      .from("workspaces")
+      .update({
+        name,
+        slug: workspaceSlugDraft.trim().toLowerCase() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", workspaceId);
+    setWorkspaceBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("บันทึกข้อมูล workspace แล้ว");
+    await refreshWorkspace();
+  };
+
+  const archiveWorkspace = async () => {
+    if (!supabase || !workspaceId) return;
+    setWorkspaceBusy(true);
+    const { error } = await supabase
+      .from("workspaces")
+      .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", workspaceId);
+    setWorkspaceBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("ย้าย workspace เข้าคลังแล้ว");
+    await refreshWorkspace();
+  };
+
+  const leaveWorkspace = async () => {
+    if (!supabase || !workspaceId || !session?.user) return;
+    setWorkspaceBusy(true);
+    const { error } = await supabase
+      .from("workspace_members")
+      .delete()
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", session.user.id);
+    setWorkspaceBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("ออกจาก workspace แล้ว");
+    await refreshWorkspace();
+  };
+
+  const createWorkspaceInviteLink = async () => {
+    if (!supabase || !workspaceId) return;
+    setWorkspaceBusy(true);
+    const { data, error } = await supabase.rpc("issue_workspace_invite", {
+      p_workspace: workspaceId,
+      p_ttl_minutes: 1440,
+    });
+    setWorkspaceBusy(false);
+    if (error || !data) {
+      toast.error(error?.message || "สร้างลิงก์เชิญไม่สำเร็จ");
+      return;
+    }
+    const origin =
+      (typeof window !== "undefined" ? window.location.origin : "") ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      "";
+    const url = `${origin.replace(/\/$/, "")}/join?token=${encodeURIComponent(String(data))}`;
+    setInviteLink(url);
+    toast.success("สร้างลิงก์เชิญแล้ว");
+  };
+
+  const upsertContentType = async () => {
+    if (!supabase || !workspaceId) return;
+    const label = ctLabelDraft.trim();
+    const slug =
+      ctSlugDraft.trim().toLowerCase() ||
+      label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    if (!label || !slug) {
+      toast.error("กรอกชื่อประเภทคอนเทนต์");
+      return;
+    }
+    setContentTypeBusy("create");
+    const nextOrder =
+      Math.max(0, ...contentTypeRows.map((row) => Number(row.sort_order || 0))) + 10;
+    const { error } = await supabase.from("content_types").upsert(
+      {
+        workspace_id: workspaceId,
+        slug,
+        label,
+        color: ctColorDraft.trim() || null,
+        sort_order: nextOrder,
+        is_archived: false,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "workspace_id,slug" }
+    );
+    setContentTypeBusy(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setCtLabelDraft("");
+    setCtSlugDraft("");
+    toast.success("บันทึก content type แล้ว");
+    await refreshContentTypes();
+  };
+
+  const moveContentType = async (id: string, direction: "up" | "down") => {
+    if (!supabase) return;
+    const list = [...activeContentTypes];
+    const idx = list.findIndex((row) => row.id === id);
+    if (idx < 0) return;
+    const swapWith = direction === "up" ? idx - 1 : idx + 1;
+    if (swapWith < 0 || swapWith >= list.length) return;
+    const current = list[idx];
+    const target = list[swapWith];
+    setContentTypeBusy(id);
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("content_types")
+      .upsert([
+        { id: current.id, sort_order: target.sort_order, updated_at: now },
+        { id: target.id, sort_order: current.sort_order, updated_at: now },
+      ]);
+    setContentTypeBusy(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("จัดลำดับ content type แล้ว");
+    await refreshContentTypes();
+  };
+
+  const archiveContentType = async (id: string) => {
+    if (!supabase) return;
+    setContentTypeBusy(id);
+    const { error } = await supabase
+      .from("content_types")
+      .update({ is_archived: true, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    setContentTypeBusy(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("เก็บประเภทคอนเทนต์แล้ว");
+    await refreshContentTypes();
+  };
+
+  const loadApiKeys = useCallback(async () => {
+    if (!workspaceId) return;
+    setApiKeyBusy(true);
+    try {
+      const response = await fetch(`/api/openclaw/keys?workspaceId=${encodeURIComponent(workspaceId)}`);
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        keys?: Array<{
+          id: string;
+          name: string;
+          prefix: string;
+          scopes: string[];
+          last_used_at: string | null;
+          revoked_at: string | null;
+          created_at: string;
+        }>;
+        error?: string;
+      };
+      if (!response.ok || !payload.ok) {
+        toast.error(payload.error || "โหลด API keys ไม่สำเร็จ");
+        return;
+      }
+      setApiKeys(payload.keys ?? []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "โหลด API keys ไม่สำเร็จ");
+    } finally {
+      setApiKeyBusy(false);
+    }
+  }, [workspaceId]);
+
+  const createApiKey = async () => {
+    if (!workspaceId) return;
+    const name = apiKeyName.trim();
+    if (!name) {
+      toast.error("กรอกชื่อ API key");
+      return;
+    }
+    setApiKeyBusy(true);
+    try {
+      const response = await fetch("/api/openclaw/keys", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId, name }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        key?: string;
+        error?: string;
+      };
+      if (!response.ok || !payload.ok || !payload.key) {
+        toast.error(payload.error || "สร้าง API key ไม่สำเร็จ");
+        return;
+      }
+      setNewlyIssuedKey(payload.key);
+      setApiKeyName("");
+      toast.success("สร้าง API key แล้ว (จะแสดงครั้งเดียว)");
+      await loadApiKeys();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "สร้าง API key ไม่สำเร็จ");
+    } finally {
+      setApiKeyBusy(false);
+    }
+  };
+
+  const revokeApiKey = async (id: string) => {
+    setApiKeyBusy(true);
+    try {
+      const response = await fetch("/api/openclaw/keys", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (!response.ok || !payload.ok) {
+        toast.error(payload.error || "ยกเลิก API key ไม่สำเร็จ");
+        return;
+      }
+      toast.success("ยกเลิก API key แล้ว");
+      await loadApiKeys();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ยกเลิก API key ไม่สำเร็จ");
+    } finally {
+      setApiKeyBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!canAccessAdmin || !workspaceId) return;
+    void loadApiKeys();
+  }, [canAccessAdmin, workspaceId, loadApiKeys]);
+
+  useEffect(() => {
+    if (!telegramPopupOpen || telegramChatId) return;
+    const timer = window.setInterval(() => {
+      void refreshProfile();
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [telegramPopupOpen, telegramChatId, refreshProfile]);
+
+  useEffect(() => {
+    if (telegramPopupOpen && telegramChatId) {
+      setTelegramPopupOpen(false);
+      toast.success("เชื่อม Telegram สำเร็จแล้ว");
+    }
+  }, [telegramPopupOpen, telegramChatId]);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-10">
       <div>
@@ -506,7 +941,9 @@ export function SettingsPageClient() {
           <TabsTrigger value="profile">โปรไฟล์</TabsTrigger>
           <TabsTrigger value="project">โปรเจกต์</TabsTrigger>
           <TabsTrigger value="access">การเข้าถึง</TabsTrigger>
+          <TabsTrigger value="content-types">Content Types</TabsTrigger>
           <TabsTrigger value="workspace">ทีม Workspace</TabsTrigger>
+          <TabsTrigger value="integrations">OpenClaw/API</TabsTrigger>
           <TabsTrigger value="appearance">รูปลักษณ์</TabsTrigger>
           <TabsTrigger value="about">เกี่ยวกับ</TabsTrigger>
         </TabsList>
@@ -520,6 +957,20 @@ export function SettingsPageClient() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center gap-3 rounded-lg border bg-muted/20 p-3">
+                <Avatar
+                  src={avatarUrl}
+                  fallback={identityInitials}
+                  colorClassName={avatarColor}
+                  className="h-11 w-11 text-sm"
+                />
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{displayName || email}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    initials: {identityInitials}
+                  </p>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="display-name">ชื่อที่แสดง</Label>
                 <Input
@@ -602,9 +1053,50 @@ export function SettingsPageClient() {
                   className="gap-2"
                 >
                   <MaterialIcon name="send" size={16} />
-                  {linkingTelegram ? "กำลังสร้างลิงก์…" : "เชื่อมต่อ Telegram"}
+                  {linkingTelegram ? "กำลังสร้างลิงก์…" : "เชื่อมต่อ Telegram (Popup)"}
                 </Button>
               </div>
+
+              {canAccessAdmin ? (
+                <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label>สถานะ Telegram Webhook</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={telegramWebhookBusy}
+                        onClick={() => void loadTelegramWebhookStatus()}
+                      >
+                        ตรวจสอบสถานะ
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={telegramWebhookBusy}
+                        onClick={() => void setupTelegramWebhook()}
+                      >
+                        ตั้งค่า/รีเซ็ต Webhook
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    ต้องตั้งค่า webhook อย่างน้อย 1 ครั้งเพื่อให้คำสั่ง `/start` ถูกส่งเข้าเว็บ
+                  </p>
+                  {telegramWebhookInfo ? (
+                    <div className="text-xs text-muted-foreground">
+                      <p>url: {telegramWebhookInfo.url || "—"}</p>
+                      <p>pending updates: {telegramWebhookInfo.pending_update_count ?? 0}</p>
+                      {telegramWebhookInfo.last_error_message ? (
+                        <p className="text-destructive">
+                          last error: {telegramWebhookInfo.last_error_message}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="space-y-2">
                 <Label htmlFor="telegram-enabled">เปิดแจ้งเตือนรายวัน</Label>
@@ -779,6 +1271,101 @@ export function SettingsPageClient() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="content-types" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Type of Content</CardTitle>
+              <CardDescription>
+                เพิ่ม/แก้ไขประเภทคอนเทนต์ระดับ workspace และจัดลำดับการแสดงผลในหน้า Brief
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2 sm:grid-cols-[1fr_180px_120px_auto]">
+                <Input
+                  placeholder="Label เช่น Educational"
+                  value={ctLabelDraft}
+                  onChange={(e) => setCtLabelDraft(e.target.value)}
+                />
+                <Input
+                  placeholder="slug เช่น educational"
+                  value={ctSlugDraft}
+                  onChange={(e) => setCtSlugDraft(e.target.value)}
+                />
+                <Input
+                  type="color"
+                  value={ctColorDraft}
+                  onChange={(e) => setCtColorDraft(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  disabled={contentTypeBusy === "create"}
+                  onClick={() => void upsertContentType()}
+                >
+                  เพิ่ม
+                </Button>
+              </div>
+              <ul className="divide-y rounded-lg border text-sm">
+                {contentTypeLoading ? (
+                  <li className="px-3 py-2 text-muted-foreground">กำลังโหลด…</li>
+                ) : activeContentTypes.length ? (
+                  activeContentTypes.map((row, idx) => (
+                    <li
+                      key={row.id}
+                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-2 font-medium">
+                          <span
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: row.color ?? "#5B6CFF" }}
+                          />
+                          {row.label}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{row.slug}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={contentTypeBusy === row.id || idx === 0}
+                          onClick={() => void moveContentType(row.id, "up")}
+                        >
+                          ↑
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            contentTypeBusy === row.id ||
+                            idx === activeContentTypes.length - 1
+                          }
+                          onClick={() => void moveContentType(row.id, "down")}
+                        >
+                          ↓
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          disabled={contentTypeBusy === row.id}
+                          onClick={() => void archiveContentType(row.id)}
+                        >
+                          archive
+                        </Button>
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <li className="px-3 py-2 text-muted-foreground">ยังไม่มี content type</li>
+                )}
+              </ul>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="workspace" className="space-y-4">
           <Card>
             <CardHeader>
@@ -827,6 +1414,89 @@ export function SettingsPageClient() {
                       </Select>
                     </div>
                   ) : null}
+                  <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                    <p className="text-sm font-medium">Workspace lifecycle</p>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                      <Input
+                        placeholder="ชื่อ workspace ใหม่"
+                        value={newWorkspaceName}
+                        onChange={(e) => setNewWorkspaceName(e.target.value)}
+                      />
+                      <Input
+                        placeholder="slug (optional)"
+                        value={newWorkspaceSlug}
+                        onChange={(e) => setNewWorkspaceSlug(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        disabled={workspaceBusy || !session?.user}
+                        onClick={() => void createWorkspace()}
+                      >
+                        สร้าง Workspace
+                      </Button>
+                    </div>
+
+                    {isWorkspaceAdmin ? (
+                      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                        <Input
+                          placeholder="ชื่อ workspace ปัจจุบัน"
+                          value={workspaceRenameDraft}
+                          onChange={(e) => setWorkspaceRenameDraft(e.target.value)}
+                        />
+                        <Input
+                          placeholder="slug"
+                          value={workspaceSlugDraft}
+                          onChange={(e) => setWorkspaceSlugDraft(e.target.value)}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={workspaceBusy}
+                          onClick={() => void renameWorkspace()}
+                        >
+                          บันทึกชื่อ
+                        </Button>
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2">
+                      {isWorkspaceAdmin ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={workspaceBusy || !workspaceId}
+                            onClick={() => void createWorkspaceInviteLink()}
+                          >
+                            สร้าง Invite Link
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={workspaceBusy || !workspaceId}
+                            onClick={() => void archiveWorkspace()}
+                          >
+                            เก็บเข้าคลัง
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={workspaceBusy || !workspaceId}
+                          onClick={() => void leaveWorkspace()}
+                        >
+                          ออกจากทีม
+                        </Button>
+                      )}
+                    </div>
+                    {inviteLink ? (
+                      <div className="rounded-md border bg-background px-3 py-2 text-xs">
+                        <p className="font-medium">Invite URL</p>
+                        <p className="mt-1 break-all text-muted-foreground">{inviteLink}</p>
+                      </div>
+                    ) : null}
+                  </div>
                   {isWorkspaceAdmin ? (
                     <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
                       <p className="text-sm font-medium">เชิญสมาชิกด้วยอีเมล</p>
@@ -1048,15 +1718,26 @@ export function SettingsPageClient() {
                           key={m.user_id}
                           className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
                         >
-                          <span>
-                            {m.display_name?.trim() ||
-                              m.email?.trim() ||
-                              m.user_id.slice(0, 8) + "…"}
-                            {m.email ? (
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                {m.email}
+                          <span className="flex min-w-0 items-center gap-2">
+                            <Avatar
+                              fallback={buildUserInitials(
+                                m.display_name?.trim() || null,
+                                m.email?.trim() || null
+                              )}
+                              className="h-7 w-7 text-[10px]"
+                            />
+                            <span className="min-w-0">
+                              <span className="truncate">
+                                {m.display_name?.trim() ||
+                                  m.email?.trim() ||
+                                  buildUserInitials(null, null)}
                               </span>
-                            ) : null}
+                              {m.email ? (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  {m.email}
+                                </span>
+                              ) : null}
+                            </span>
                           </span>
                           <div className="flex items-center gap-2">
                             {isWorkspaceAdmin ? (
@@ -1106,6 +1787,103 @@ export function SettingsPageClient() {
                       ))}
                     </ul>
                   </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="integrations" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">OpenClaw API Keys</CardTitle>
+              <CardDescription>
+                ใช้เชื่อม OpenClaw เพื่อส่งข้อมูลเข้าเว็บอัตโนมัติผ่าน Ingest API
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!canAccessAdmin ? (
+                <p className="text-sm text-muted-foreground">
+                  เฉพาะผู้ดูแลระบบสามารถจัดการ API keys
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    <Input
+                      placeholder="ชื่อ key เช่น OpenClaw production"
+                      value={apiKeyName}
+                      onChange={(e) => setApiKeyName(e.target.value)}
+                      className="max-w-sm"
+                    />
+                    <Button
+                      type="button"
+                      disabled={apiKeyBusy}
+                      onClick={() => void createApiKey()}
+                    >
+                      สร้าง API key
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={apiKeyBusy}
+                      onClick={() => void loadApiKeys()}
+                    >
+                      รีเฟรช
+                    </Button>
+                  </div>
+                  {newlyIssuedKey ? (
+                    <div className="rounded-lg border border-amber-400/60 bg-amber-50/80 p-3 text-xs dark:border-amber-400/40 dark:bg-amber-950/20">
+                      <p className="font-semibold">คีย์นี้จะแสดงครั้งเดียว</p>
+                      <p className="mt-1 break-all">{newlyIssuedKey}</p>
+                    </div>
+                  ) : null}
+
+                  <ul className="divide-y rounded-lg border text-sm">
+                    {apiKeys.length ? (
+                      apiKeys.map((key) => (
+                        <li
+                          key={key.id}
+                          className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium">{key.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {key.prefix} · last used:{" "}
+                              {key.last_used_at
+                                ? new Date(key.last_used_at).toLocaleString("th-TH")
+                                : "never"}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            disabled={apiKeyBusy || !!key.revoked_at}
+                            onClick={() => void revokeApiKey(key.id)}
+                          >
+                            {key.revoked_at ? "revoked" : "revoke"}
+                          </Button>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="px-3 py-2 text-muted-foreground">
+                        ยังไม่มี API key
+                      </li>
+                    )}
+                  </ul>
+
+                  {workspaceId ? (
+                    <div className="rounded-lg border bg-muted/20 p-3 text-xs">
+                      <p className="font-medium">ตัวอย่างเรียก Ingest API</p>
+                      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap">
+{`curl -X POST "$SITE_URL/api/ingest/briefs" \\
+  -H "Authorization: Bearer <YOUR_KEY>" \\
+  -H "content-type: application/json" \\
+  -d '{"workspaceId":"${workspaceId}","source":"openclaw","brief":{"topic":"New campaign"}}'`}
+                      </pre>
+                    </div>
+                  ) : null}
                 </>
               )}
             </CardContent>
@@ -1173,6 +1951,60 @@ export function SettingsPageClient() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={telegramPopupOpen} onOpenChange={setTelegramPopupOpen}>
+        <DialogContent showCloseButton className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>เชื่อมต่อ Telegram</DialogTitle>
+            <DialogDescription>
+              คลิกปุ่มเพื่อเปิด Telegram Desktop แบบ popup หรือสแกน QR จากมือถือ แล้วส่ง
+              คำสั่ง `/start` ตาม token นี้
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <p className="text-xs text-muted-foreground">Token</p>
+              <p className="mt-1 break-all font-mono text-xs">{telegramToken || "—"}</p>
+            </div>
+            {telegramWebLink ? (
+              <div className="flex justify-center rounded-lg border bg-white p-3">
+                <Image
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                    telegramWebLink
+                  )}`}
+                  alt="Telegram deep-link QR"
+                  className="h-[220px] w-[220px]"
+                  width={220}
+                  height={220}
+                />
+              </div>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={openTelegramPopup} className="gap-2">
+                <MaterialIcon name="open_in_new" size={16} />
+                เปิด Telegram Desktop (Popup)
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (!telegramToken) return;
+                  void navigator.clipboard.writeText(`/start ${telegramToken}`);
+                  toast.success("คัดลอกคำสั่ง /start แล้ว");
+                }}
+              >
+                Copy /start command
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              สถานะปัจจุบัน:{" "}
+              <span className={telegramChatId ? "text-emerald-600" : "text-amber-600"}>
+                {telegramChatId ? "เชื่อมต่อแล้ว" : "รอยืนยันจาก Telegram..."}
+              </span>
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

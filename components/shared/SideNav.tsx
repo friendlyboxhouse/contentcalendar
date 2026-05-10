@@ -33,6 +33,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MobileOnly, RailNarrow, RailWide } from "@/lib/responsive";
+import { Avatar } from "@/components/ui/avatar";
+import { buildUserInitials } from "@/lib/initials";
 
 const DEMO_KEY = "content-planner-demo-seeded-v1";
 
@@ -76,6 +78,8 @@ export function SideNav() {
     setActiveWorkspace,
     canAccessAdmin,
     displayName,
+    avatarUrl,
+    avatarColor,
     organizationName,
     organizationTagline,
     reportFooterNote,
@@ -106,6 +110,7 @@ export function SideNav() {
   ];
   const activeWorkspace = workspaces.find((w) => w.id === workspaceId) ?? workspaces[0];
   const workspaceBadge = (activeWorkspace?.name?.trim()?.charAt(0) ?? "W").toUpperCase();
+  const identityInitials = buildUserInitials(displayName, session?.user?.email ?? null);
 
   return (
     <aside
@@ -320,7 +325,12 @@ export function SideNav() {
           {configured && session?.user && (
             <div className="space-y-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 max-xl:hidden">
               <div className="flex items-start gap-2 text-xs">
-                <MaterialIcon name="person" size={18} className="mt-0.5 shrink-0" />
+                <Avatar
+                  src={avatarUrl}
+                  fallback={identityInitials}
+                  colorClassName={avatarColor}
+                  className="mt-0.5 h-8 w-8 shrink-0 text-[11px]"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">
                     {displayName ?? session.user.email ?? session.user.id.slice(0, 8)}

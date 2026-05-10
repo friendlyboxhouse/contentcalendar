@@ -24,6 +24,7 @@ import type { SupabasePublicEnv } from "@/lib/supabase/config";
 import { toastSupabasePersistError } from "@/lib/supabase/persistErrors";
 import { DEMO_KEY } from "@/components/shared/SideNav";
 import { clearPlannerClientStorage } from "@/lib/clientStorage";
+import { deterministicAvatarColor } from "@/lib/initials";
 
 export type PlannerRole = "viewer" | "editor" | "admin";
 const ACTIVE_WORKSPACE_KEY = "cp:active-workspace";
@@ -65,6 +66,8 @@ type Ctx = {
   canAccessAdmin: boolean;
   /** ชื่อที่ใช้ในแอป (จาก profiles.display_name) */
   displayName: string | null;
+  avatarUrl: string | null;
+  avatarColor: string;
   telegramChatId: string | null;
   telegramUsername: string | null;
   telegramNotificationsEnabled: boolean;
@@ -95,6 +98,8 @@ const SupabaseAppContext = createContext<Ctx>({
   refreshWorkspace: async () => {},
   canAccessAdmin: false,
   displayName: null,
+  avatarUrl: null,
+  avatarColor: deterministicAvatarColor(null),
   telegramChatId: null,
   telegramUsername: null,
   telegramNotificationsEnabled: false,
@@ -133,6 +138,10 @@ export function SupabaseAppProvider({
   const [authHydrated, setAuthHydrated] = useState(false);
   const [role, setRole] = useState<PlannerRole>("editor");
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarColor, setAvatarColor] = useState<string>(
+    deterministicAvatarColor(null)
+  );
   const [telegramChatId, setTelegramChatId] = useState<string | null>(null);
   const [telegramUsername, setTelegramUsername] = useState<string | null>(null);
   const [telegramNotificationsEnabled, setTelegramNotificationsEnabled] = useState(false);
@@ -187,6 +196,8 @@ export function SupabaseAppProvider({
       setRole("editor");
       setCanAccessAdmin(false);
       setDisplayName(null);
+      setAvatarUrl(null);
+      setAvatarColor(deterministicAvatarColor(null));
       setTelegramChatId(null);
       setTelegramUsername(null);
       setTelegramNotificationsEnabled(false);
@@ -199,7 +210,7 @@ export function SupabaseAppProvider({
     const { data, error } = await supabase
       .from("profiles")
       .select(
-        "role, display_name, telegram_chat_id, telegram_username, telegram_notifications_enabled, telegram_daily_time, telegram_timezone"
+        "role, display_name, avatar_url, avatar_color, telegram_chat_id, telegram_username, telegram_notifications_enabled, telegram_daily_time, telegram_timezone"
       )
       .eq("id", session.user.id)
       .maybeSingle();
@@ -207,6 +218,8 @@ export function SupabaseAppProvider({
       console.warn(error.message);
       setRole("editor");
       setDisplayName(null);
+      setAvatarUrl(null);
+      setAvatarColor(deterministicAvatarColor(session.user.id));
       setTelegramChatId(null);
       setTelegramUsername(null);
       setTelegramNotificationsEnabled(false);
@@ -219,6 +232,18 @@ export function SupabaseAppProvider({
       const dn = data?.display_name;
       setDisplayName(
         typeof dn === "string" && dn.trim() ? dn.trim() : null
+      );
+      const avatarUrlRaw = data?.avatar_url;
+      setAvatarUrl(
+        typeof avatarUrlRaw === "string" && avatarUrlRaw.trim()
+          ? avatarUrlRaw.trim()
+          : null
+      );
+      const avatarColorRaw = data?.avatar_color;
+      setAvatarColor(
+        typeof avatarColorRaw === "string" && avatarColorRaw.trim()
+          ? avatarColorRaw.trim()
+          : deterministicAvatarColor(session.user.id)
       );
       const chatIdRaw = data?.telegram_chat_id;
       setTelegramChatId(
@@ -267,6 +292,68 @@ export function SupabaseAppProvider({
       return;
     }
     setWorkspaceLoading(true);
+    const preferredId =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(ACTIVE_WORKSPACE_KEY)
+        : null;
+
+    const { data: bootstrap, error: bootstrapError } = await supabase.rpc(
+      "workspace_user_bootstrap",
+      { p_workspace: preferredId || null }
+    );
+
+    if (!bootstrapError && bootstrap) {
+      const payload = bootstrap as {
+        selected_workspace_id?: string | null;
+        workspaces?: Array<Record<string, unknown>>;
+        members?: Array<Record<string, unknown>>;
+      };
+      const joined: WorkspaceSummary[] = (payload.workspaces ?? [])
+        .map((row) => ({
+          id: String(row.id || ""),
+          role:
+            row.role === "viewer" || row.role === "editor" || row.role === "admin"
+              ? (row.role as PlannerRole)
+              : "editor",
+          name: String(row.name || "Workspace"),
+          slug: row.slug ? String(row.slug) : null,
+        }))
+        .filter((row) => row.id);
+      setWorkspaces(joined);
+
+      const selected =
+        joined.find((w) => w.id === payload.selected_workspace_id) ??
+        joined.find((w) => w.id === preferredId) ??
+        joined[0] ??
+        null;
+      const wsId = selected?.id ?? null;
+      setWorkspaceId(wsId);
+      setWorkspaceRole(selected?.role ?? null);
+      if (wsId && typeof window !== "undefined") {
+        window.localStorage.setItem(ACTIVE_WORKSPACE_KEY, wsId);
+      }
+
+      const mappedMembers: WorkspaceMemberRow[] = (payload.members ?? [])
+        .map((row) => {
+          const role = row.role as PlannerRole;
+          return {
+            user_id: String(row.user_id || ""),
+            role:
+              role === "viewer" || role === "editor" || role === "admin"
+                ? role
+                : "editor",
+            email: row.email ? String(row.email) : null,
+            display_name: row.display_name ? String(row.display_name) : null,
+          };
+        })
+        .filter((row) => row.user_id);
+
+      setWorkspaceMembers(mappedMembers);
+      setWorkspaceLoading(false);
+      setContentSyncedOnce(true);
+      return;
+    }
+
     const uid = session.user.id;
 
     const { data: membershipRows, error: mineErr } = await supabase
@@ -296,8 +383,9 @@ export function SupabaseAppProvider({
     const ids = memberships.map((m) => m.workspace_id);
     const { data: wsRows, error: wsErr } = await supabase
       .from("workspaces")
-      .select("id, name, slug")
-      .in("id", ids);
+      .select("id, name, slug, archived_at")
+      .in("id", ids)
+      .is("archived_at", null);
     if (wsErr) {
       toast.error(`โหลดรายการ workspace ล้มเหลว: ${wsErr.message}`);
       setWorkspaceId(null);
@@ -337,10 +425,6 @@ export function SupabaseAppProvider({
 
     setWorkspaces(joined);
 
-    const preferredId =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(ACTIVE_WORKSPACE_KEY)
-        : null;
     const selected =
       joined.find((w) => w.id === preferredId) ??
       joined[0] ??
@@ -544,7 +628,18 @@ export function SupabaseAppProvider({
     };
 
     const bulkUpsert = async (items: ContentItem[]) => {
-      await Promise.all(items.map((i) => upsertItem(i)));
+      if (!items.length) return;
+      const rows = items.map((item) => ({
+        post_id: item.id,
+        user_id: userId,
+        workspace_id: wsId,
+        payload: JSON.parse(JSON.stringify(item)) as Record<string, unknown>,
+        updated_at: new Date().toISOString(),
+      }));
+      const { error } = await supabase
+        .from("content_items")
+        .upsert(rows, { onConflict: "post_id" });
+      if (error) toastSupabasePersistError(error);
     };
 
     setSyncHandlers({
@@ -557,7 +652,9 @@ export function SupabaseAppProvider({
       const { data, error } = await supabase
         .from("content_items")
         .select("payload")
-        .eq("workspace_id", wsId);
+        .eq("workspace_id", wsId)
+        .order("updated_at", { ascending: false })
+        .limit(500);
 
       if (cancelled) return;
 
@@ -637,6 +734,8 @@ export function SupabaseAppProvider({
       refreshWorkspace,
       canAccessAdmin,
       displayName,
+      avatarUrl,
+      avatarColor,
       telegramChatId,
       telegramUsername,
       telegramNotificationsEnabled,
@@ -666,6 +765,8 @@ export function SupabaseAppProvider({
       refreshWorkspace,
       canAccessAdmin,
       displayName,
+      avatarUrl,
+      avatarColor,
       telegramChatId,
       telegramUsername,
       telegramNotificationsEnabled,
