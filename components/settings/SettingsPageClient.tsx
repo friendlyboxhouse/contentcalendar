@@ -30,7 +30,6 @@ import {
 } from "@/components/supabase/SupabaseAppProvider";
 import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
 import { cn } from "@/lib/utils";
-import { debugSessionLog } from "@/lib/debugSessionLog";
 const ROLE_HELP: Record<PlannerRole, { title: string; body: string }> = {
   viewer: {
     title: "ผู้ดู",
@@ -50,7 +49,6 @@ export function SettingsPageClient() {
   const {
     supabase,
     session,
-    authHydrated,
     role,
     workspaceId,
     workspaceRole,
@@ -90,34 +88,6 @@ export function SettingsPageClient() {
   const [mergingWorkspace, setMergingWorkspace] = useState(false);
 
   useEffect(() => setMounted(true), []);
-
-  // #region agent log
-  useEffect(() => {
-    debugSessionLog({
-      runId: "initial",
-      hypothesisId: "H2-H3-H5",
-      location: "SettingsPageClient.tsx:state",
-      message: "settings supabase snapshot",
-      data: {
-        loadingProfile,
-        workspaceLoading,
-        hasWorkspaceId: Boolean(workspaceId),
-        role,
-        hasDisplayName: Boolean(displayName?.trim()),
-        authHydrated,
-        hasSession: Boolean(session?.user),
-      },
-    })
-  }, [
-    loadingProfile,
-    workspaceLoading,
-    workspaceId,
-    role,
-    displayName,
-    session?.user,
-    authHydrated,
-  ])
-  // #endregion
 
   useEffect(() => {
     setNameDraft(displayName ?? "");

@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { ThemeProvider } from "next-themes";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Toaster } from "sonner";
 import { useContentStore } from "@/store/contentStore";
 import { useKPIReminder } from "@/hooks/useKPIReminder";
@@ -64,6 +66,8 @@ export function Providers({
         {children}
         <Toaster richColors position="top-center" theme="system" />
         <CommandPaletteGate />
+        <Analytics />
+        <SpeedInsights />
       </SupabaseAppProvider>
     </ThemeProvider>
   );

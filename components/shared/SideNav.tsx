@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MobileOnly, RailNarrow, RailWide } from "@/lib/responsive";
 
 const DEMO_KEY = "content-planner-demo-seeded-v1";
 
@@ -149,11 +150,13 @@ export function SideNav() {
                 )}
               >
                 <MaterialIcon name={symbol} className="shrink-0" size={24} />
-                <span className="hidden xl:inline">{label}</span>
-                {/* ชื่อย่อ: มือถือ (แถบล่าง) + แท็บเล็ต/จอแคบ (ไซด์ไอคอน) — เดิมมีแค่ max-md เลยหายช่วง md–xl */}
-                <span className="block max-w-[4.5rem] truncate text-center text-[10px] font-semibold leading-tight xl:hidden max-md:text-[11px] max-md:max-w-[4.25rem]">
+                <RailWide>{label}</RailWide>
+                <RailNarrow className="max-w-[4.5rem] truncate text-center text-[10px] font-semibold leading-tight">
                   {mobileLabel}
-                </span>
+                </RailNarrow>
+                <MobileOnly className="block max-w-[4.25rem] truncate text-center text-[11px] font-semibold leading-tight">
+                  {mobileLabel}
+                </MobileOnly>
               </Link>
             );
           })}
@@ -163,8 +166,8 @@ export function SideNav() {
           <div className="space-y-1 max-md:hidden">
             <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               <MaterialIcon name="groups" size={14} className="xl:hidden" />
-              <span className="max-xl:hidden">Workspace</span>
-              <span className="hidden xl:hidden max-xl:inline">WS</span>
+              <RailWide>Workspace</RailWide>
+              <RailNarrow>WS</RailNarrow>
             </p>
             <Select
               value={workspaceId ?? ""}
@@ -253,8 +256,8 @@ export function SideNav() {
         <div className="space-y-3 max-md:hidden">
           <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <MaterialIcon name="category" size={14} />
-            <span className="max-xl:hidden">หมวดคอนเทนต์</span>
-            <span className="hidden xl:hidden max-xl:inline">หมวด</span>
+            <RailWide>หมวดคอนเทนต์</RailWide>
+            <RailNarrow>หมวด</RailNarrow>
           </p>
           <ul className="space-y-1.5 max-xl:space-y-2">
             {(Object.keys(PILLAR_CONFIG) as ContentPillar[]).map((key) => {
@@ -283,8 +286,8 @@ export function SideNav() {
           <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-sidebar-accent min-h-10">
             <span className="flex items-center gap-1">
               <MaterialIcon name="flag" size={14} />
-              <span className="max-xl:hidden">สถานะ</span>
-              <span className="hidden xl:hidden max-xl:inline">สถานะ</span>
+              <RailWide>สถานะ</RailWide>
+              <RailNarrow>สถานะ</RailNarrow>
             </span>
             <MaterialIcon name="expand_more" size={18} className="hidden opacity-70 xl:block" />
           </CollapsibleTrigger>

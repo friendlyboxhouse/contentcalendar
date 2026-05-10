@@ -1,47 +1,17 @@
 "use client"
 
-import { useLayoutEffect, useRef } from "react"
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
-import { debugSessionLog } from "@/lib/debugSessionLog"
 
 function Tabs({
   className,
   orientation = "horizontal",
   ...props
 }: TabsPrimitive.Root.Props) {
-  const rootRef = useRef<HTMLDivElement | null>(null)
-  // #region agent log
-  useLayoutEffect(() => {
-    const el = rootRef.current
-    if (!el) return
-    const cs = getComputedStyle(el)
-    const panels = el.querySelectorAll('[role="tabpanel"]')
-    let visibleTabpanels = 0
-    panels.forEach((p) => {
-      const h = p as HTMLElement
-      if (!h.hidden && !h.hasAttribute("hidden")) visibleTabpanels += 1
-    })
-    debugSessionLog({
-      runId: "initial",
-      hypothesisId: "H1-H4",
-      location: "tabs.tsx:Tabs",
-      message: "tabs root layout + tabpanels",
-      data: {
-        flexDirection: cs.flexDirection,
-        dataOrientation: el.getAttribute("data-orientation"),
-        tabpanelCount: panels.length,
-        visibleTabpanels,
-        clientWidth: el.clientWidth,
-      },
-    })
-  }, [orientation])
-  // #endregion
   return (
     <TabsPrimitive.Root
-      ref={rootRef}
       data-slot="tabs"
       data-orientation={orientation}
       className={cn(
