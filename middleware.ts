@@ -20,6 +20,16 @@ function isBareHome(pathname: string, search: string): boolean {
   return pathname === "/" && !search;
 }
 
+function isLocalLoopbackHost(hostname: string) {
+  const h = hostname.toLowerCase()
+  return (
+    h === "localhost" ||
+    h === "127.0.0.1" ||
+    h === "::1" ||
+    h === "[::1]"
+  )
+}
+
 function redirectAnonymousToLogin(
   request: NextRequest,
   pathname: string,
@@ -46,6 +56,19 @@ function redirectAnonymousToLogin(
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  /** Local NDJSON sink — ใช้เฉพาะ localhost (รวม `next start` ที่ NODE_ENV=production) */
+  if (
+    pathname === "/api/debug-log" &&
+    isLocalLoopbackHost(request.nextUrl.hostname)
+  ) {
+    return NextResponse.next({
+      headers: {
+        "Cache-Control": "private, no-store, must-revalidate",
+        Vary: "Cookie, Accept-Encoding",
+        "x-cp-middleware": "1",
+      },
+    });
+  }
   const nextParam = `${pathname}${request.nextUrl.search}`;
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/auth");

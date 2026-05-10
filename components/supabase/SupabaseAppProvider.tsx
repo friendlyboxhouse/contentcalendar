@@ -24,6 +24,7 @@ import type { SupabasePublicEnv } from "@/lib/supabase/config";
 import { toastSupabasePersistError } from "@/lib/supabase/persistErrors";
 import { DEMO_KEY } from "@/components/shared/SideNav";
 import { clearPlannerClientStorage } from "@/lib/clientStorage";
+import { debugSessionLog } from "@/lib/debugSessionLog";
 
 export type PlannerRole = "viewer" | "editor" | "admin";
 const ACTIVE_WORKSPACE_KEY = "cp:active-workspace";
@@ -181,6 +182,19 @@ export function SupabaseAppProvider({
       .select("role, display_name")
       .eq("id", session.user.id)
       .maybeSingle();
+    // #region agent log
+    debugSessionLog({
+      runId: "initial",
+      hypothesisId: "H2",
+      location: "SupabaseAppProvider.tsx:refreshProfile",
+      message: "profiles fetch result",
+      data: {
+        hasError: Boolean(error),
+        errCode: error?.code ?? null,
+        hasRow: Boolean(data),
+      },
+    })
+    // #endregion
     if (error) {
       console.warn(error.message);
       setRole("editor");
@@ -224,6 +238,20 @@ export function SupabaseAppProvider({
       .select("workspace_id, role")
       .eq("user_id", uid)
       .order("joined_at", { ascending: true });
+
+    // #region agent log
+    debugSessionLog({
+      runId: "initial",
+      hypothesisId: "H2",
+      location: "SupabaseAppProvider.tsx:refreshWorkspace",
+      message: "workspace_members self query",
+      data: {
+        hasMineErr: Boolean(mineErr),
+        mineErrCode: mineErr?.code ?? null,
+        membershipRowCount: membershipRows?.length ?? 0,
+      },
+    })
+    // #endregion
 
     if (mineErr || !membershipRows?.length) {
       if (mineErr) console.warn("workspace_members:", mineErr.message);
