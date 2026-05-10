@@ -34,6 +34,7 @@ import {
   Hourglass,
   History,
   Home,
+  KanbanSquare,
   Info,
   Keyboard,
   Layers3,
@@ -168,6 +169,7 @@ const MATERIAL_ICON_MAP: Record<string, IconComponent> = {
   timeline: Activity,
   track_changes: Target,
   tune: SlidersHorizontal,
+  view_kanban: KanbanSquare,
   visibility: Eye,
   warning: AlertTriangle,
 };

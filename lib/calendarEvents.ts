@@ -153,14 +153,19 @@ export function buildCalendarEvents(
 
   return items
     .filter((item) => statusInMode(item.status, mode))
-    .map((item) => ({
-      id: `${item.id}:publish`,
-      item,
-      kind: "publish" as const,
-      date: new Date(item.publishDate),
-      recommendedDate: new Date(item.publishDate),
-      dateOverridden: false,
-      status: item.status,
-      done: false,
-    }));
+    .map((item) => {
+      const recommendedDate = new Date(item.publishDate);
+      const effectiveDate = getMilestoneEffectiveDate(item, "publish");
+      const override = item.milestoneState?.publish?.dateOverride;
+      return {
+        id: `${item.id}:publish`,
+        item,
+        kind: "publish" as const,
+        date: effectiveDate,
+        recommendedDate,
+        dateOverridden: Boolean(override),
+        status: getMilestoneStatus(item, "publish"),
+        done: getMilestoneDone(item, "publish"),
+      };
+    });
 }

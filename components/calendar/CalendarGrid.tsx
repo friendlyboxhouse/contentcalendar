@@ -55,10 +55,6 @@ export function CalendarGrid({
   canEditMilestones?: boolean;
 }) {
   const updateItem = useContentStore((s) => s.updateItem);
-  const updateMilestoneDate = useContentStore((s) => s.updateMilestoneDate);
-  const clearMilestoneDateOverride = useContentStore(
-    (s) => s.clearMilestoneDateOverride
-  );
   const shiftMilestonesFrom = useContentStore((s) => s.shiftMilestonesFrom);
   const updateMilestoneStatus = useContentStore((s) => s.updateMilestoneStatus);
   const toggleMilestoneDone = useContentStore((s) => s.toggleMilestoneDone);
@@ -104,49 +100,35 @@ export function CalendarGrid({
         nextPublish.getDate() === prev.getDate();
       if (sameDay) return;
 
-      updateMilestoneDate(
-        milestoneEvent.item.id,
-        milestoneEvent.kind as MilestoneKind,
-        nextPublish
-      );
-
       const dayDelta = Math.round(
         (nextPublish.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24)
       );
+
+      // Ask BEFORE writing — cancel is then a true no-op
       const answer = window.prompt(
-        "ย้าย milestone สำเร็จ\n1 = ขยับ milestone ถัดไปตาม\n2 = ย้ายเฉพาะ milestone นี้\n0 = ยกเลิกการเปลี่ยนแปลง",
+        "ต้องการย้าย milestone นี้อย่างไร?\n1 = ย้ายพร้อมขยับ milestone ถัดไปทั้งหมด\n2 = ย้ายเฉพาะ milestone นี้\n0 = ยกเลิก",
         "2"
       );
 
-      if (answer === "0") {
-        if (milestoneEvent.dateOverridden) {
-          updateMilestoneDate(
-            milestoneEvent.item.id,
-            milestoneEvent.kind as MilestoneKind,
-            prev
-          );
-        } else {
-          clearMilestoneDateOverride(
-            milestoneEvent.item.id,
-            milestoneEvent.kind as MilestoneKind
-          );
-        }
+      if (!answer || answer === "0") {
         toast.message("ยกเลิกการย้ายวัน");
         return;
       }
 
-      if (answer === "1" && dayDelta !== 0) {
-        shiftMilestonesFrom(
-          milestoneEvent.item.id,
-          milestoneEvent.kind as MilestoneKind,
-          dayDelta,
-          "following"
-        );
-        toast.success("ย้ายวันและขยับ milestone ถัดไปแล้ว");
-        return;
-      }
+      // Single atomic write — source always moves; cascade depends on answer
+      shiftMilestonesFrom(
+        milestoneEvent.item.id,
+        milestoneEvent.kind as MilestoneKind,
+        nextPublish,
+        dayDelta,
+        answer === "1" ? "following" : "single"
+      );
 
-      toast.success("ย้ายเฉพาะ milestone นี้แล้ว");
+      if (answer === "1") {
+        toast.success("ย้ายวันและขยับ milestone ถัดไปแล้ว");
+      } else {
+        toast.success("ย้ายเฉพาะ milestone นี้แล้ว");
+      }
       return;
     }
 
@@ -203,6 +185,15 @@ export function CalendarGrid({
           <span className="text-base font-semibold capitalize">
             {format(month, "MMMM yyyy", { locale: th })}
           </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => onMonthChange(new Date())}
+          >
+            วันนี้
+          </Button>
         </div>
         <Link href="/briefs/new">
           <Button size="sm" type="button" className="gap-1">

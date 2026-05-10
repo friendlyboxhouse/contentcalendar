@@ -47,6 +47,7 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { ownerLabelFromStored } from "@/lib/ownerMapping";
 
 function toDateInputValue(date: Date): string {
   const d = new Date(date);
@@ -58,7 +59,7 @@ function toDateInputValue(date: Date): string {
 
 export function CalendarPageClient() {
   const hydrated = useContentStoreHydrated();
-  const { workspaceLoading, contentSyncedOnce } = useSupabaseApp();
+  const { workspaceLoading, contentSyncedOnce, workspaceMembers } = useSupabaseApp();
   const items = useContentStore((s) => s.items);
   const updateStatus = useContentStore((s) => s.updateStatus);
   const updateMilestoneStatus = useContentStore((s) => s.updateMilestoneStatus);
@@ -68,7 +69,16 @@ export function CalendarPageClient() {
   );
   const toggleMilestoneDone = useContentStore((s) => s.toggleMilestoneDone);
   const deleteItem = useContentStore((s) => s.deleteItem);
-  const [month, setMonth] = useState(() => new Date());
+  const [month, setMonth] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem("cp-calendar-month");
+      if (saved) {
+        const d = new Date(saved);
+        if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), 1);
+      }
+    }
+    return new Date();
+  });
   const [selected, setSelected] = useState<ContentItem | null>(null);
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [calendarMode, setCalendarMode] = useState<CalendarMode>("scheduled");
@@ -111,6 +121,14 @@ export function CalendarPageClient() {
     window.localStorage.setItem("cp-calendar-mode", calendarMode);
   }, [calendarMode]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      "cp-calendar-month",
+      `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-01`
+    );
+  }, [month]);
+
   const filtered = useMemo(
     () => filterContentItems(items, deferredFilters),
     [items, deferredFilters]
@@ -129,6 +147,19 @@ export function CalendarPageClient() {
       return d.getFullYear() === y && d.getMonth() === m;
     });
   }, [events, month]);
+
+  // For "scheduled" mode: detect when there are events but none in current month
+  const nearestScheduledMonth = useMemo(() => {
+    if (calendarMode !== "scheduled" || events.length === 0) return null;
+    if (monthFiltered.length > 0) return null;
+    // Find the nearest event date
+    const sorted = [...events].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    const nearest = sorted[0];
+    const d = new Date(nearest.date);
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  }, [calendarMode, events, monthFiltered]);
 
   const listRows = useMemo(() => {
     if (calendarMode === "workflow") {
@@ -247,6 +278,38 @@ export function CalendarPageClient() {
         </div>
       </div>
 
+      {/* Scheduled empty-state banner */}
+      {calendarMode === "scheduled" && events.length === 0 && (
+        <div className="rounded-xl border border-dashed bg-muted/30 px-6 py-8 text-center">
+          <p className="text-sm font-medium text-muted-foreground">
+            ยังไม่มีคอนเทนต์ที่อยู่ในสถานะ scheduled / published / kpi_pending
+          </p>
+          <a
+            href="/briefs"
+            className="mt-2 inline-block text-sm font-medium text-primary underline-offset-2 hover:underline"
+          >
+            ไปที่ Content Brief
+          </a>
+        </div>
+      )}
+      {calendarMode === "scheduled" && nearestScheduledMonth && (
+        <div className="flex items-center gap-3 rounded-xl border border-dashed bg-muted/30 px-4 py-3 text-sm">
+          <MaterialIcon name="info" size={16} className="shrink-0 text-muted-foreground" />
+          <span className="text-muted-foreground">
+            ไม่มีคอนเทนต์กำหนดลงในเดือนนี้
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="ml-auto h-7"
+            onClick={() => setMonth(nearestScheduledMonth)}
+          >
+            ไปยังเดือนที่มีกำหนดลง
+          </Button>
+        </div>
+      )}
+
       {view === "calendar" && !narrow ? (
         <CalendarGrid
           events={monthFiltered}
@@ -340,7 +403,7 @@ export function CalendarPageClient() {
                       </div>
                     ) : null}
                   </TableCell>
-                  <TableCell>{item.owner}</TableCell>
+                  <TableCell>{ownerLabelFromStored(item.owner, workspaceMembers)}</TableCell>
                   {calendarMode === "workflow" ? (
                     <TableCell className="text-xs font-medium">
                       <span className="inline-flex items-center gap-1.5">
@@ -489,7 +552,7 @@ export function CalendarPageClient() {
                 <p className="text-xs text-muted-foreground">{selected.hook}</p>
               </div>
               <p className="text-xs">
-                Owner: <strong>{selected.owner}</strong>
+                Owner: <strong>{ownerLabelFromStored(selected.owner, workspaceMembers)}</strong>
               </p>
               <p className="text-xs">
                 Publish:{" "}

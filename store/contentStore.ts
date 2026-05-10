@@ -50,8 +50,9 @@ interface ContentStore {
   shiftMilestonesFrom: (
     id: string,
     sourceKind: MilestoneKind,
+    sourceDate: Date,
     dayDelta: number,
-    mode: "following"
+    mode: "following" | "single"
   ) => void;
   snoozeKPIReminder: (id: string) => void;
 
@@ -253,24 +254,40 @@ export const useContentStore = create<ContentStore>()(
         get().updateItem(id, { milestoneState: next });
       },
 
-      shiftMilestonesFrom: (id, sourceKind, dayDelta, mode) => {
-        if (mode !== "following" || dayDelta === 0) return;
+      shiftMilestonesFrom: (id, sourceKind, sourceDate, dayDelta, mode) => {
         const item = get().items.find((entry) => entry.id === id);
         if (!item) return;
         const sourceIdx = WORKFLOW_MILESTONE_KINDS.indexOf(sourceKind);
         if (sourceIdx < 0) return;
-        const nextMilestoneState = { ...(item.milestoneState ?? {}) };
-        const targets = WORKFLOW_MILESTONE_KINDS.slice(sourceIdx + 1);
-        for (const kind of targets) {
-          const baseDate = getMilestoneEffectiveDate(item, kind);
-          const shifted = new Date(baseDate);
-          shifted.setDate(shifted.getDate() + dayDelta);
-          shifted.setHours(12, 0, 0, 0);
-          nextMilestoneState[kind] = {
-            ...(nextMilestoneState[kind] ?? {}),
-            dateOverride: shifted,
-          };
+
+        // Always pin source date first
+        const pinnedDate = new Date(sourceDate);
+        pinnedDate.setHours(12, 0, 0, 0);
+        const nextMilestoneState = {
+          ...(item.milestoneState ?? {}),
+          [sourceKind]: {
+            ...(item.milestoneState?.[sourceKind] ?? {}),
+            dateOverride: pinnedDate,
+          },
+        };
+
+        // Cascade following kinds using accumulating state so chain math is correct
+        if (mode === "following" && dayDelta !== 0) {
+          // Use a temp item reference that reflects accumulated overrides
+          let accItem = { ...item, milestoneState: nextMilestoneState };
+          for (const kind of WORKFLOW_MILESTONE_KINDS.slice(sourceIdx + 1)) {
+            const baseDate = getMilestoneEffectiveDate(accItem, kind);
+            const shifted = new Date(baseDate);
+            shifted.setDate(shifted.getDate() + dayDelta);
+            shifted.setHours(12, 0, 0, 0);
+            nextMilestoneState[kind] = {
+              ...(nextMilestoneState[kind] ?? {}),
+              dateOverride: shifted,
+            };
+            accItem = { ...accItem, milestoneState: { ...nextMilestoneState } };
+          }
         }
+
         get().updateItem(id, { milestoneState: nextMilestoneState });
       },
 

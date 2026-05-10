@@ -62,6 +62,7 @@ import {
   OwnerMemberSelect,
   ownerStoredFromMember,
 } from "@/components/shared/OwnerMemberSelect";
+import { resolveOwnerUserId } from "@/lib/ownerMapping";
 import {
   AssetFolderLinkField,
   ReferenceLinksField,
@@ -640,6 +641,13 @@ export function BriefDetailClient({ briefId }: Props) {
                   setField("owner", ownerStoredFromMember(m))
                 }
               />
+              {draft.owner &&
+                !resolveOwnerUserId(draft.owner, workspaceMembers) &&
+                workspaceMembers.length > 0 && (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    Owner &quot;{draft.owner}&quot; ยังไม่ตรงกับสมาชิกในทีม — กรุณาเลือกสมาชิกใหม่
+                  </p>
+                )}
             </div>
             <div>
               <Label>Assignees</Label>

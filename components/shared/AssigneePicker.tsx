@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { buildUserInitials } from "@/lib/initials";
+import { memberLabelFromUserId } from "@/lib/ownerMapping";
 import { MaterialIcon } from "@/components/ui/material-icon";
 
 interface AssigneePickerProps {
@@ -30,6 +31,7 @@ export function AssigneePicker({
   const { workspaceMembers } = useSupabaseApp();
   const { activeItems: roles } = useAssignmentRoles();
   const [userIdDraft, setUserIdDraft] = useState("");
+  const firstRoleId = useMemo(() => roles[0]?.id ?? "", [roles]);
   const [roleIdDraft, setRoleIdDraft] = useState("");
 
   const memberById = useMemo(
@@ -42,20 +44,22 @@ export function AssigneePicker({
   );
 
   const addAssignee = () => {
-    if (!userIdDraft || !roleIdDraft) return;
+    const resolvedRoleId = roleIdDraft || firstRoleId;
+    if (!userIdDraft || !resolvedRoleId) return;
     const exists = value.some(
-      (entry) => entry.userId === userIdDraft && entry.roleId === roleIdDraft
+      (entry) => entry.userId === userIdDraft && entry.roleId === resolvedRoleId
     );
     if (exists) return;
     onChange([
       ...value,
       {
         userId: userIdDraft,
-        roleId: roleIdDraft,
+        roleId: resolvedRoleId,
         addedAt: new Date(),
       },
     ]);
     setUserIdDraft("");
+    setRoleIdDraft("");
   };
 
   const removeAssignee = (entry: TaskAssignee) => {
@@ -81,13 +85,13 @@ export function AssigneePicker({
           <SelectContent>
             {workspaceMembers.map((member) => (
               <SelectItem key={member.user_id} value={member.user_id}>
-                {member.display_name || member.email || member.user_id}
+                {member.display_name || member.email || member.user_id.slice(0, 8)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select
-          value={roleIdDraft}
+          value={roleIdDraft || firstRoleId}
           onValueChange={(v) => setRoleIdDraft(v ?? "")}
           disabled={disabled}
         >
@@ -126,7 +130,7 @@ export function AssigneePicker({
                     className="h-6 w-6 text-[10px]"
                   />
                   <span className="truncate">
-                    {member?.display_name || member?.email || entry.userId}
+                    {member?.display_name || member?.email || memberLabelFromUserId(entry.userId, workspaceMembers)}
                   </span>
                   <span className="rounded bg-background px-1.5 py-0.5 text-xs text-muted-foreground">
                     {role?.label || entry.roleId}

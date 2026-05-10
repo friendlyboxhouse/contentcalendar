@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Avatar } from "@/components/ui/avatar";
 import { buildUserInitials } from "@/lib/initials";
+import { memberLabelFromUserId } from "@/lib/ownerMapping";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 
 type BoardCardProps =
@@ -56,7 +57,7 @@ export function BoardCard(props: BoardCardProps) {
           </>
         ) : (
           <>
-            <span>{props.item.id}</span>
+            <span>{props.item.topic || props.item.id}</span>
             <StatusBadge status={props.item.status} />
           </>
         )}
@@ -72,7 +73,7 @@ export function BoardCard(props: BoardCardProps) {
                 member?.email ?? null
               )}
               className="h-6 w-6 text-[10px]"
-              title={member?.display_name || member?.email || entry.userId}
+              title={memberLabelFromUserId(entry.userId, workspaceMembers)}
             />
           );
         })}

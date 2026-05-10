@@ -39,11 +39,12 @@ import { usePlannerPermissions } from "@/hooks/usePlannerPermissions";
 import { useContentStoreHydrated } from "@/hooks/useContentStoreHydrated";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
 import { PageHeader } from "@/components/ui/page-header";
+import { ownerLabelFromStored } from "@/lib/ownerMapping";
 
 function BriefsInner() {
   const router = useRouter();
   const hydrated = useContentStoreHydrated();
-  const { workspaceLoading, contentSyncedOnce } = useSupabaseApp();
+  const { workspaceLoading, contentSyncedOnce, workspaceMembers } = useSupabaseApp();
   const items = useContentStore((s) => s.items);
   const updateStatus = useContentStore((s) => s.updateStatus);
   const deleteItem = useContentStore((s) => s.deleteItem);
@@ -232,7 +233,7 @@ function BriefsInner() {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     <span>{FORMAT_LABELS[item.format]}</span>
                     <span>{item.platform.map((p) => PLATFORM_LABELS[p]).join(", ")}</span>
-                    <span>ผู้รับผิดชอบ: {item.owner}</span>
+                    <span>ผู้รับผิดชอบ: {ownerLabelFromStored(item.owner, workspaceMembers)}</span>
                     {nearest && (
                       <CountdownTimer
                         label={nearest.label}

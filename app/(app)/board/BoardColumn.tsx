@@ -8,19 +8,24 @@ export function BoardColumn({
   label,
   count,
   children,
+  idPrefix = "list",
+  className,
 }: {
   listId: string;
   label: string;
   count: number;
   children: React.ReactNode;
+  idPrefix?: string;
+  className?: string;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `list:${listId}` });
+  const { setNodeRef, isOver } = useDroppable({ id: `${idPrefix}:${listId}` });
   return (
     <section
       ref={setNodeRef}
       className={cn(
         "min-h-[280px] rounded-xl border bg-muted/20 p-3",
-        isOver && "ring-2 ring-primary/40"
+        isOver && "ring-2 ring-primary/40",
+        className
       )}
     >
       <div className="mb-2 flex items-center justify-between">
