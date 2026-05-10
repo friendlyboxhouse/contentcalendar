@@ -474,7 +474,9 @@ export function SettingsPageClient() {
           ตั้งค่า
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          โปรไฟล์ การตั้งค่าโปรเจกต์ สิทธิ์ และรูปลักษณ์ของแอป
+          โปรไฟล์ การตั้งค่าโปรเจกต์ สิทธิ์ และรูปลักษณ์ของแอป — การแจ้งเตือน Telegram
+          อยู่ในแท็บ «โปรไฟล์» (เลื่อนลงใต้บัญชี) · Discord Daily Summary อยู่ในแท็บ «ทีม
+          Workspace»
         </p>
       </div>
 
