@@ -58,6 +58,7 @@ export const STATUS_CONFIG = {
     bgColor: "#F9FAFB",
     dotColor: "#9CA3AF",
     emoji: "💡",
+    iconName: "lightbulb",
     order: 1,
   },
   in_brief: {
@@ -66,6 +67,7 @@ export const STATUS_CONFIG = {
     bgColor: "#DBEAFE",
     dotColor: "#3B82F6",
     emoji: "📝",
+    iconName: "edit_note",
     order: 2,
   },
   in_production: {
@@ -74,6 +76,7 @@ export const STATUS_CONFIG = {
     bgColor: "#EDE9FE",
     dotColor: "#8B5CF6",
     emoji: "🎨",
+    iconName: "palette",
     order: 3,
   },
   in_review: {
@@ -82,6 +85,7 @@ export const STATUS_CONFIG = {
     bgColor: "#FEF3C7",
     dotColor: "#F59E0B",
     emoji: "🔍",
+    iconName: "search",
     order: 4,
   },
   revision: {
@@ -90,6 +94,7 @@ export const STATUS_CONFIG = {
     bgColor: "#FEE2E2",
     dotColor: "#EF4444",
     emoji: "🔄",
+    iconName: "refresh",
     order: 5,
   },
   pending_approval: {
@@ -98,6 +103,7 @@ export const STATUS_CONFIG = {
     bgColor: "#FFEDD5",
     dotColor: "#F97316",
     emoji: "⏳",
+    iconName: "hourglass",
     order: 6,
   },
   approved: {
@@ -106,6 +112,7 @@ export const STATUS_CONFIG = {
     bgColor: "#D1FAE5",
     dotColor: "#10B981",
     emoji: "✅",
+    iconName: "check_circle",
     order: 7,
   },
   scheduled: {
@@ -114,6 +121,7 @@ export const STATUS_CONFIG = {
     bgColor: "#CFFAFE",
     dotColor: "#06B6D4",
     emoji: "📅",
+    iconName: "schedule",
     order: 8,
   },
   published: {
@@ -122,6 +130,7 @@ export const STATUS_CONFIG = {
     bgColor: "#DCFCE7",
     dotColor: "#22C55E",
     emoji: "🚀",
+    iconName: "rocket",
     order: 9,
   },
   kpi_pending: {
@@ -130,6 +139,7 @@ export const STATUS_CONFIG = {
     bgColor: "#F3E8FF",
     dotColor: "#A855F7",
     emoji: "📊",
+    iconName: "bar_chart",
     order: 10,
   },
 } as const;

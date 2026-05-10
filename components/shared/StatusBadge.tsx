@@ -65,7 +65,8 @@ export function StatusBadge({
         className="h-1.5 w-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: config.dotColor }}
       />
-      {config.emoji} {config.label}
+      <MaterialIcon name={config.iconName} size={13} className="shrink-0" />
+      {config.label}
       {editable ? (
         <MaterialIcon name="expand_more" size={14} className="opacity-60" />
       ) : null}
@@ -99,9 +100,12 @@ export function StatusBadge({
                 className="h-2 w-2 shrink-0 rounded-full"
                 style={{ backgroundColor: cfg.dotColor }}
               />
-              <span>
-                {cfg.emoji} {cfg.label}
-              </span>
+              <MaterialIcon
+                name={cfg.iconName}
+                size={14}
+                className="shrink-0 text-muted-foreground"
+              />
+              <span>{cfg.label}</span>
             </button>
           ))}
         </div>

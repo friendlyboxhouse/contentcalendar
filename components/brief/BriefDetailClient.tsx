@@ -532,43 +532,38 @@ export function BriefDetailClient({ briefId }: Props) {
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <div className="flex min-w-max gap-1 pb-1">
+          <div className="flex min-w-max items-center gap-1 pb-1">
             {CONTENT_STATUSES_ORDERED.map((st, idx) => {
               const cfg = STATUS_CONFIG[st];
-              const shortLabel =
-                cfg.label
-                  .split(" ")
-                  .map((part) => part.slice(0, 1))
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase() || String(cfg.order);
+              const active = draft.status === st;
               return (
                 <div key={st} className="flex items-center gap-1">
                   <button
                     type="button"
                     disabled={!canEdit}
                     aria-label={`เปลี่ยนสถานะเป็น ${cfg.label}`}
+                    title={cfg.label}
                     className={cn(
-                      "min-h-10 rounded-full px-3 py-2 text-xs font-medium transition disabled:pointer-events-none disabled:opacity-40",
-                      draft.status === st
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted hover:bg-muted/80"
+                      "inline-flex min-h-10 min-w-[88px] items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium transition sm:min-w-[128px] disabled:pointer-events-none disabled:opacity-70",
+                      active
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-muted text-foreground hover:bg-muted/80"
                     )}
                     onClick={() => beginStatusChange(st)}
                   >
-                    <span className="hidden sm:inline">
-                      {cfg.emoji} {cfg.label}
-                    </span>
-                    <span className="inline-flex items-center gap-1 sm:hidden" title={cfg.label}>
-                      <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: cfg.dotColor }}
-                      />
-                      <span className="font-semibold">{shortLabel}</span>
-                    </span>
+                    <MaterialIcon
+                      name={cfg.iconName}
+                      size={14}
+                      className={cn("shrink-0", !active && "text-muted-foreground")}
+                    />
+                    <span className="truncate">{cfg.label}</span>
                   </button>
                   {idx < CONTENT_STATUSES_ORDERED.length - 1 && (
-                    <span className="text-muted-foreground">→</span>
+                    <MaterialIcon
+                      name="chevron_right"
+                      size={16}
+                      className="shrink-0 text-muted-foreground/70"
+                    />
                   )}
                 </div>
               );
