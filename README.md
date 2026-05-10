@@ -24,6 +24,17 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 หน้าหลักอยู่ที่ `app/(app)/page.tsx` (Dashboard). แก้แล้ว dev server จะรีเฟรชอัตโนมัติ.
 
+## Cron jobs
+
+Daily Telegram และ Discord digest ใช้ GitHub Actions เรียก API ทุก 15 นาที แทน Vercel Cron เพื่อไม่ชน limit ของ Vercel Hobby plan.
+
+ตั้งค่า GitHub repository secrets:
+
+- `CRON_BASE_URL`: โดเมนจริงของเว็บ เช่น `https://your-domain.com`
+- `CRON_SECRET`: ค่าเดียวกับ env `CRON_SECRET` บน hosting
+
+workflow อยู่ที่ `.github/workflows/cron-digests.yml` และสามารถกดรันเองได้จาก GitHub Actions ผ่าน `workflow_dispatch`.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

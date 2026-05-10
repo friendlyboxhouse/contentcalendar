@@ -1,12 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/telegram-daily",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/discord-daily",
-      "schedule": "*/15 * * * *"
-    }
-  ]
-}
+{}
