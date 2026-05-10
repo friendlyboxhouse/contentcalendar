@@ -52,6 +52,30 @@ type DiscordChannelRow = {
   is_enabled: boolean;
 };
 
+function openTelegramAppLink(botUsername: string, token: string) {
+  if (typeof window === "undefined") return;
+
+  const username = botUsername.replace(/^@/, "");
+  const encodedUsername = encodeURIComponent(username);
+  const encodedToken = encodeURIComponent(token);
+  const appLink = `tg://resolve?domain=${encodedUsername}&start=${encodedToken}`;
+  const webLink = `https://t.me/${encodedUsername}?start=${encodedToken}`;
+  let openedApp = false;
+
+  const markOpened = () => {
+    openedApp = true;
+  };
+  window.addEventListener("blur", markOpened, { once: true });
+  document.addEventListener("visibilitychange", markOpened, { once: true });
+
+  window.location.href = appLink;
+  window.setTimeout(() => {
+    window.removeEventListener("blur", markOpened);
+    document.removeEventListener("visibilitychange", markOpened);
+    if (!openedApp) window.location.href = webLink;
+  }, 1200);
+}
+
 export function SettingsPageClient() {
   const {
     supabase,
@@ -246,11 +270,8 @@ export function SettingsPageClient() {
       setLinkingTelegram(false);
       return;
     }
-    const deepLink = `https://t.me/${botUsername}?start=${encodeURIComponent(token)}`;
-    if (typeof window !== "undefined") {
-      window.open(deepLink, "_blank", "noopener,noreferrer");
-    }
-    toast.success("เปิด Telegram เพื่อยืนยันการเชื่อมต่อแล้ว");
+    openTelegramAppLink(botUsername, token);
+    toast.success("กำลังเปิด Telegram เพื่อยืนยันการเชื่อมต่อ");
     setLinkingTelegram(false);
   };
 
