@@ -4,8 +4,6 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTaskStore } from "@/store/taskStore";
 import { useSupabaseApp } from "@/components/supabase/SupabaseAppProvider";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -16,6 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { FormSection } from "@/components/ui/form-section";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { useTaskLists } from "@/hooks/useTaskLists";
 import { useTaskTypes } from "@/hooks/useTaskTypes";
 import { AssigneePicker } from "@/components/shared/AssigneePicker";
@@ -98,114 +103,157 @@ export function TaskDetailClient({ taskId }: { taskId?: string }) {
     router.push("/board");
   };
 
+  const hasScheduleData =
+    draft.list_id || draft.task_type_id || draft.due_at || (draft.payload?.assignees as TaskAssignee[] | undefined)?.length;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{existing ? "แก้ไขงาน" : "สร้างงานใหม่"}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>ชื่องาน</Label>
-          <Input
-            value={draft.title}
-            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-            disabled={!canEdit}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>รายละเอียด</Label>
-          <Textarea
-            rows={4}
-            value={draft.description ?? ""}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                description: e.target.value || null,
-              })
-            }
-            disabled={!canEdit}
-          />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label>คอลัมน์</Label>
-            <Select
-              value={draft.list_id ?? ""}
-              onValueChange={(v) => setDraft({ ...draft, list_id: v || null })}
-              disabled={!canEdit}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="เลือกคอลัมน์" />
-              </SelectTrigger>
-              <SelectContent>
-                {lists.map((list) => (
-                  <SelectItem key={list.id} value={list.id}>
-                    {list.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <div className="space-y-3">
+      <FormSection
+        icon="assignment"
+        title={existing ? "แก้ไขงาน" : "สร้างงานใหม่"}
+        description="ชื่องานและรายละเอียด"
+        defaultOpen
+        requiredHint={!draft.title.trim() ? "⚠ ยังไม่มีชื่องาน" : undefined}
+      >
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>
+              ชื่องาน <span className="text-destructive">*</span>
+            </Label>
+            <InputGroup>
+              <InputGroupAddon align="inline-start">
+                <MaterialIcon name="edit_note" size={16} className="text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupInput
+                value={draft.title}
+                onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                disabled={!canEdit}
+                placeholder="ชื่องานที่ต้องทำ"
+              />
+            </InputGroup>
           </div>
-          <div className="space-y-2">
-            <Label>ประเภทงาน</Label>
-            <Select
-              value={draft.task_type_id ?? ""}
-              onValueChange={(v) =>
-                setDraft({ ...draft, task_type_id: v || null })
-              }
-              disabled={!canEdit}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="เลือกประเภท" />
-              </SelectTrigger>
-              <SelectContent>
-                {types.map((type) => (
-                  <SelectItem key={type.id} value={type.id}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>กำหนดส่ง</Label>
-            <Input
-              type="date"
-              value={dateValue}
+          <div className="space-y-1.5">
+            <Label>รายละเอียด <span className="text-muted-foreground text-xs">(ไม่บังคับ)</span></Label>
+            <Textarea
+              rows={4}
+              value={draft.description ?? ""}
               onChange={(e) =>
                 setDraft({
                   ...draft,
-                  due_at: e.target.value
-                    ? new Date(`${e.target.value}T12:00:00`)
-                    : null,
+                  description: e.target.value || null,
+                })
+              }
+              disabled={!canEdit}
+              placeholder="รายละเอียดเพิ่มเติม บริบท หรือขั้นตอน"
+            />
+          </div>
+        </div>
+      </FormSection>
+
+      <FormSection
+        icon="event_available"
+        title="กำหนดการและผู้รับผิดชอบ"
+        description="คอลัมน์, ประเภทงาน, วันครบกำหนด, ผู้รับผิดชอบ"
+        badge={hasScheduleData ? "มีข้อมูล" : ""}
+      >
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <MaterialIcon name="category" size={15} className="text-muted-foreground" />
+                คอลัมน์
+              </Label>
+              <Select
+                value={draft.list_id ?? ""}
+                onValueChange={(v) => setDraft({ ...draft, list_id: v || null })}
+                disabled={!canEdit}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือกคอลัมน์" />
+                </SelectTrigger>
+                <SelectContent>
+                  {lists.map((list) => (
+                    <SelectItem key={list.id} value={list.id}>
+                      {list.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <MaterialIcon name="layers" size={15} className="text-muted-foreground" />
+                ประเภทงาน
+              </Label>
+              <Select
+                value={draft.task_type_id ?? ""}
+                onValueChange={(v) =>
+                  setDraft({ ...draft, task_type_id: v || null })
+                }
+                disabled={!canEdit}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือกประเภท" />
+                </SelectTrigger>
+                <SelectContent>
+                  {types.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <MaterialIcon name="schedule" size={15} className="text-muted-foreground" />
+                กำหนดส่ง
+              </Label>
+              <InputGroup>
+                <InputGroupAddon align="inline-start">
+                  <MaterialIcon name="calendar_month" size={15} className="text-muted-foreground" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  type="date"
+                  value={dateValue}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      due_at: e.target.value
+                        ? new Date(`${e.target.value}T12:00:00`)
+                        : null,
+                    })
+                  }
+                  disabled={!canEdit}
+                />
+              </InputGroup>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>ผู้รับผิดชอบ</Label>
+            <AssigneePicker
+              value={(draft.payload?.assignees as TaskAssignee[]) ?? []}
+              onChange={(next) =>
+                setDraft({
+                  ...draft,
+                  payload: { ...(draft.payload ?? {}), assignees: next },
                 })
               }
               disabled={!canEdit}
             />
           </div>
         </div>
-        <div className="space-y-2">
-          <Label>ผู้รับผิดชอบ</Label>
-          <AssigneePicker
-            value={(draft.payload?.assignees as TaskAssignee[]) ?? []}
-            onChange={(next) =>
-              setDraft({
-                ...draft,
-                payload: { ...(draft.payload ?? {}), assignees: next },
-              })
-            }
-            disabled={!canEdit}
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button type="button" onClick={save} disabled={!canEdit}>
-            บันทึก
-          </Button>
-          <Button type="button" variant="outline" onClick={() => router.push("/board")}>
-            ยกเลิก
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      </FormSection>
+
+      <div className="flex gap-2">
+        <Button type="button" onClick={save} disabled={!canEdit} className="gap-1">
+          <MaterialIcon name="save" size={16} />
+          บันทึก
+        </Button>
+        <Button type="button" variant="outline" onClick={() => router.push("/board")}>
+          ยกเลิก
+        </Button>
+      </div>
+    </div>
   );
 }

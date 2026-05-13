@@ -52,6 +52,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { MaterialIcon } from "@/components/ui/material-icon";
+import { FormSection } from "@/components/ui/form-section";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group";
 import {
   useSupabaseApp,
 } from "@/components/supabase/SupabaseAppProvider";
@@ -166,6 +173,17 @@ export function BriefDetailClient({ briefId }: Props) {
   const [genericStatusOpen, setGenericStatusOpen] = useState(false);
   const [pendingGenericStatus, setPendingGenericStatus] =
     useState<ContentStatus | null>(null);
+
+  const [secIdentity, setSecIdentity] = useState(true);
+  const [secBrief, setSecBrief] = useState(true);
+  const [secSchedule, setSecSchedule] = useState(true);
+  const [secGuidelines, setSecGuidelines] = useState(false);
+  const [secRefs, setSecRefs] = useState(false);
+  const [secApproval, setSecApproval] = useState(false);
+  const [secKpi, setSecKpi] = useState(false);
+  const allOpen = secIdentity && secBrief && secSchedule && secGuidelines && secRefs && secApproval && secKpi;
+  const expandAll = () => { setSecIdentity(true); setSecBrief(true); setSecSchedule(true); setSecGuidelines(true); setSecRefs(true); setSecApproval(true); setSecKpi(true); };
+  const collapseAll = () => { setSecIdentity(false); setSecBrief(false); setSecSchedule(false); setSecGuidelines(false); setSecRefs(false); setSecApproval(false); setSecKpi(false); };
 
   useEffect(() => {
     if (isNew && seedNewRef.current) {
@@ -315,6 +333,50 @@ export function BriefDetailClient({ briefId }: Props) {
     return rows;
   }, [funnelStage]);
 
+  const sectionBadges = useMemo(() => {
+    if (!draft) return { identity: "", briefContent: "", schedule: "", guidelines: "", refs: "", approval: "", kpi: "" };
+
+    const identityFields = [
+      draft.owner.trim() !== "",
+      (draft.assignees?.length ?? 0) > 0,
+      true,
+      true,
+      true,
+      true,
+      (draft.campaign ?? "").trim() !== "",
+      draft.platform.length > 0,
+    ];
+    const identityFilled = identityFields.filter(Boolean).length;
+
+    const briefFields = [draft.topic, draft.angle, draft.targetAudience, draft.hook, draft.captionDirection, draft.visualDirection, draft.cta, draft.strategicNotes];
+    const briefFilled = briefFields.filter((v) => (v ?? "").trim() !== "").length;
+
+    const scheduleFields = [true, (draft.publishTime ?? "") !== "", true];
+    const scheduleFilled = scheduleFields.filter(Boolean).length;
+
+    const dosCount = draft.dos.filter((x) => x.trim()).length;
+    const dontsCount = draft.donts.filter((x) => x.trim()).length;
+
+    const refsFilled = [
+      draft.referenceLinks.filter((x) => x.trim()).length > 0,
+      (draft.assetFolderLink ?? "").trim() !== "",
+    ].filter(Boolean).length;
+
+    const approvalFilled = (draft.approvalTrack ?? []).filter((r) => r.name.trim() !== "").length;
+
+    const kpiFilled = Object.values(draft.kpiTargets ?? {}).filter((v) => v !== undefined && v !== null).length;
+
+    return {
+      identity: `${identityFilled}/${identityFields.length}`,
+      briefContent: `${briefFilled}/${briefFields.length}`,
+      schedule: `${scheduleFilled}/${scheduleFields.length}`,
+      guidelines: `${dosCount} DOs · ${dontsCount} DON'Ts`,
+      refs: refsFilled > 0 ? `${refsFilled}/2` : "",
+      approval: approvalFilled > 0 ? `${approvalFilled}/3` : "",
+      kpi: kpiFilled > 0 ? `${kpiFilled} ฟิลด์` : "",
+    };
+  }, [draft]);
+
   if (!hydrated || workspaceLoading || !contentSyncedOnce) {
     return <PageSpinner label="กำลังซิงค์ข้อมูลบรีฟ…" />;
   }
@@ -428,14 +490,20 @@ export function BriefDetailClient({ briefId }: Props) {
     setGenericStatusOpen(true);
   };
 
-  const validate = () => {
-    if (!draft.topic.trim()) return "กรอก Topic";
-    if (!draft.owner.trim()) return "กรอก Owner";
-    if (!draft.platform.length) return "เลือก Platform อย่างน้อย 1";
+  const validateRequired = () => {
+    if (!draft.topic.trim()) return "กรอก Topic ก่อนบันทึก";
+    if (!draft.owner.trim()) return "กรอก Owner ก่อนบันทึก";
+    return null;
+  };
+
+  const collectWarnings = (): string[] => {
+    const w: string[] = [];
+    if (!draft.platform.length) w.push("ยังไม่ได้เลือก Platform");
     const dos = draft.dos.filter((x) => x.trim());
     const donts = draft.donts.filter((x) => x.trim());
-    if (!dos.length || !donts.length) return "DOs / DON'Ts อย่างน้อยอย่างละ 1 ข้อ";
-    return null;
+    if (!dos.length) w.push("ยังไม่มี DO's");
+    if (!donts.length) w.push("ยังไม่มี DON'Ts");
+    return w;
   };
 
   const save = () => {
@@ -443,11 +511,13 @@ export function BriefDetailClient({ briefId }: Props) {
       toast.message("บัญชีของคุณเป็นโหมดดูอย่างเดียว");
       return;
     }
-    const err = validate();
+    const err = validateRequired();
     if (err) {
       toast.error(err);
       return;
     }
+    const warnings = collectWarnings();
+    for (const w of warnings) toast.warning(w);
     const cleaned: ContentItem = {
       ...draft,
       dos: draft.dos.filter((x) => x.trim()),
@@ -570,6 +640,15 @@ export function BriefDetailClient({ briefId }: Props) {
               ผลงาน
             </Link>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="hidden gap-1 sm:inline-flex"
+            onClick={allOpen ? collapseAll : expandAll}
+          >
+            <MaterialIcon name={allOpen ? "expand_less" : "expand_more"} size={16} />
+            {allOpen ? "ย่อทั้งหมด" : "ขยายทั้งหมด"}
+          </Button>
           <Button size="sm" onClick={save} disabled={!canEdit} className="gap-1">
             <MaterialIcon name="save" size={18} />
             บันทึกบรีฟ
@@ -626,13 +705,19 @@ export function BriefDetailClient({ briefId }: Props) {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Identity</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3">
+        <FormSection
+          icon="person"
+          title="Identity & Ownership"
+          description="Owner, แพลตฟอร์ม, รูปแบบ, Funnel"
+          badge={sectionBadges.identity}
+          defaultOpen
+          open={secIdentity}
+          onOpenChange={setSecIdentity}
+          requiredHint={!draft.owner.trim() ? "⚠ ยังไม่มี Owner" : undefined}
+        >
+          <div className="grid gap-3">
             <div>
-              <Label>Owner</Label>
+              <Label>Owner <span className="text-destructive">*</span></Label>
               <OwnerMemberSelect
                 members={workspaceMembers}
                 ownerDisplay={draft.owner}
@@ -657,95 +742,103 @@ export function BriefDetailClient({ briefId }: Props) {
                 onChange={(next) => setField("assignees", next as TaskAssignee[])}
               />
             </div>
-            <div>
-              <Label>Pillar</Label>
-              <Select
-                value={draft.pillar}
-                disabled={!canEdit}
-                onValueChange={(v) => setField("pillar", v as ContentPillar)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(PILLAR_CONFIG) as ContentPillar[]).map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {PILLAR_CONFIG[p].emoji} {PILLAR_CONFIG[p].label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Pillar</Label>
+                <Select
+                  value={draft.pillar}
+                  disabled={!canEdit}
+                  onValueChange={(v) => setField("pillar", v as ContentPillar)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(PILLAR_CONFIG) as ContentPillar[]).map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {PILLAR_CONFIG[p].emoji} {PILLAR_CONFIG[p].label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Format</Label>
+                <Select
+                  value={draft.format}
+                  disabled={!canEdit}
+                  onValueChange={(v) => {
+                    const f = v as ContentFormat;
+                    setField("format", f);
+                    const preset =
+                      draft.slaPresetKey ?? resolveSLAKey(f);
+                    syncDeadlines(new Date(draft.publishDate), preset, f);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(FORMAT_LABELS) as ContentFormat[]).map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {FORMAT_LABELS[f]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Content type</Label>
+                <Select
+                  value={draft.contentType}
+                  disabled={!canEdit}
+                  onValueChange={(v) => setField("contentType", v as ContentType)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contentTypes.map((t) => (
+                      <SelectItem key={t.id} value={t.slug}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Funnel</Label>
+                <Select
+                  value={draft.funnelStage}
+                  disabled={!canEdit}
+                  onValueChange={(v) => setField("funnelStage", v as FunnelStage)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(FUNNEL_CONFIG) as FunnelStage[]).map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {FUNNEL_CONFIG[f].label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
-              <Label>Format</Label>
-              <Select
-                value={draft.format}
-                disabled={!canEdit}
-                onValueChange={(v) => {
-                  const f = v as ContentFormat;
-                  setField("format", f);
-                  const preset =
-                    draft.slaPresetKey ?? resolveSLAKey(f);
-                  syncDeadlines(new Date(draft.publishDate), preset, f);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(FORMAT_LABELS) as ContentFormat[]).map((f) => (
-                    <SelectItem key={f} value={f}>
-                      {FORMAT_LABELS[f]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Content type</Label>
-              <Select
-                value={draft.contentType}
-                disabled={!canEdit}
-                onValueChange={(v) => setField("contentType", v as ContentType)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {contentTypes.map((t) => (
-                    <SelectItem key={t.id} value={t.slug}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Funnel</Label>
-              <Select
-                value={draft.funnelStage}
-                disabled={!canEdit}
-                onValueChange={(v) => setField("funnelStage", v as FunnelStage)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(FUNNEL_CONFIG) as FunnelStage[]).map((f) => (
-                    <SelectItem key={f} value={f}>
-                      {FUNNEL_CONFIG[f].label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Campaign (optional)</Label>
-              <Input
-                value={draft.campaign ?? ""}
-                disabled={!canEdit}
-                onChange={(e) => setField("campaign", e.target.value)}
-              />
+              <Label>Campaign <span className="text-muted-foreground text-xs">(ไม่บังคับ)</span></Label>
+              <InputGroup>
+                <InputGroupAddon align="inline-start">
+                  <MaterialIcon name="bolt" size={16} className="text-muted-foreground" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  value={draft.campaign ?? ""}
+                  disabled={!canEdit}
+                  placeholder="ชื่อแคมเปญ (ถ้ามี)"
+                  onChange={(e) => setField("campaign", e.target.value)}
+                />
+              </InputGroup>
             </div>
             <div>
               <Label className="mb-2 block">Platforms</Label>
@@ -753,7 +846,7 @@ export function BriefDetailClient({ briefId }: Props) {
                 {(
                   ["instagram", "tiktok", "facebook", "youtube", "threads"] as Platform[]
                 ).map((p) => (
-                  <label key={p} className="flex items-center gap-2 text-sm">
+                  <label key={p} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/60 px-3 py-1.5 text-sm transition-colors hover:bg-muted/50 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
                     <Checkbox
                       checked={draft.platform.includes(p)}
                       disabled={!canEdit}
@@ -772,37 +865,52 @@ export function BriefDetailClient({ briefId }: Props) {
                 ))}
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </FormSection>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Deadlines & SLA</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <FormSection
+          icon="event_available"
+          title="กำหนดการ & SLA"
+          description="วันโพสต์, milestones, deadline"
+          badge={sectionBadges.schedule}
+          defaultOpen
+          open={secSchedule}
+          onOpenChange={setSecSchedule}
+        >
+          <div className="space-y-4">
             <div className="grid gap-2 sm:grid-cols-2">
               <div>
-                <Label>Publish date</Label>
-                <Input
-                  type="date"
-                  value={dateStr(draft.publishDate)}
-                  disabled={!canEdit}
-                  onChange={(e) => {
-                    const next = new Date(e.target.value + "T12:00:00");
-                    const preset =
-                      draft.slaPresetKey ?? resolveSLAKey(draft.format);
-                    syncDeadlines(next, preset, draft.format);
-                  }}
-                />
+                <Label>วันที่โพสต์</Label>
+                <InputGroup>
+                  <InputGroupAddon align="inline-start">
+                    <MaterialIcon name="calendar_month" size={16} className="text-muted-foreground" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    type="date"
+                    value={dateStr(draft.publishDate)}
+                    disabled={!canEdit}
+                    onChange={(e) => {
+                      const next = new Date(e.target.value + "T12:00:00");
+                      const preset =
+                        draft.slaPresetKey ?? resolveSLAKey(draft.format);
+                      syncDeadlines(next, preset, draft.format);
+                    }}
+                  />
+                </InputGroup>
               </div>
               <div>
-                <Label>Publish time</Label>
-                <Input
-                  type="time"
-                  value={draft.publishTime ?? ""}
-                  disabled={!canEdit}
-                  onChange={(e) => setField("publishTime", e.target.value)}
-                />
+                <Label>เวลาโพสต์</Label>
+                <InputGroup>
+                  <InputGroupAddon align="inline-start">
+                    <MaterialIcon name="schedule" size={16} className="text-muted-foreground" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    type="time"
+                    value={draft.publishTime ?? ""}
+                    disabled={!canEdit}
+                    onChange={(e) => setField("publishTime", e.target.value)}
+                  />
+                </InputGroup>
               </div>
             </div>
             <SLAPresetPicker
@@ -867,162 +975,224 @@ export function BriefDetailClient({ briefId }: Props) {
               />
               <CountdownTimer targetDate={new Date(draft.publishDate)} label="Publish" />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </FormSection>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Brief content</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3">
+      <FormSection
+        icon="description"
+        title="Brief Content"
+        description="Topic, Angle, Hook, Caption, Visual, CTA"
+        badge={sectionBadges.briefContent}
+        defaultOpen
+        open={secBrief}
+        onOpenChange={setSecBrief}
+        requiredHint={!draft.topic.trim() ? "⚠ ยังไม่มี Topic" : undefined}
+      >
+        <div className="grid gap-3">
           <div>
-            <Label>Topic *</Label>
-            <Input
-              value={draft.topic}
-              disabled={!canEdit}
-              onChange={(e) => setField("topic", e.target.value)}
-            />
+            <Label>Topic <span className="text-destructive">*</span></Label>
+            <InputGroup>
+              <InputGroupAddon align="inline-start">
+                <MaterialIcon name="edit_note" size={16} className="text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupInput
+                value={draft.topic}
+                disabled={!canEdit}
+                placeholder="หัวข้อหลักของคอนเทนต์"
+                onChange={(e) => setField("topic", e.target.value)}
+              />
+            </InputGroup>
           </div>
           <div>
-            <Label>Angle</Label>
+            <Label>Angle <span className="text-muted-foreground text-xs">(ไม่บังคับ)</span></Label>
             <Input
               value={draft.angle}
               disabled={!canEdit}
+              placeholder="มุมมองหรือแนวทางที่ใช้"
               onChange={(e) => setField("angle", e.target.value)}
             />
           </div>
           <div>
-            <Label>Target audience</Label>
+            <Label>Target audience <span className="text-muted-foreground text-xs">(ไม่บังคับ)</span></Label>
             <Textarea
               rows={2}
               value={draft.targetAudience}
               disabled={!canEdit}
+              placeholder="กลุ่มเป้าหมาย เช่น อายุ ความสนใจ"
               onChange={(e) => setField("targetAudience", e.target.value)}
             />
           </div>
           <div>
-            <Label>Hook</Label>
-            <Input
-              value={draft.hook}
-              disabled={!canEdit}
-              onChange={(e) => setField("hook", e.target.value)}
-            />
+            <Label>Hook <span className="text-muted-foreground text-xs">(ไม่บังคับ)</span></Label>
+            <InputGroup>
+              <InputGroupAddon align="inline-start">
+                <MaterialIcon name="bolt" size={16} className="text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupInput
+                value={draft.hook}
+                disabled={!canEdit}
+                placeholder="ประโยคแรกที่ดึงดูดความสนใจ"
+                onChange={(e) => setField("hook", e.target.value)}
+              />
+            </InputGroup>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Caption direction <span className="text-muted-foreground text-xs">(ไม่บังคับ)</span></Label>
+              <Textarea
+                rows={4}
+                value={draft.captionDirection}
+                disabled={!canEdit}
+                placeholder="แนวทางการเขียน caption"
+                onChange={(e) => setField("captionDirection", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Visual direction <span className="text-muted-foreground text-xs">(ไม่บังคับ)</span></Label>
+              <Textarea
+                rows={4}
+                value={draft.visualDirection}
+                disabled={!canEdit}
+                placeholder="แนวทางภาพ โทนสี สไตล์"
+                onChange={(e) => setField("visualDirection", e.target.value)}
+              />
+            </div>
           </div>
           <div>
-            <Label>Caption direction</Label>
-            <Textarea
-              rows={4}
-              value={draft.captionDirection}
-              disabled={!canEdit}
-              onChange={(e) => setField("captionDirection", e.target.value)}
-            />
+            <Label>CTA <span className="text-muted-foreground text-xs">(ไม่บังคับ)</span></Label>
+            <InputGroup>
+              <InputGroupAddon align="inline-start">
+                <MaterialIcon name="flag" size={16} className="text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupInput
+                value={draft.cta}
+                disabled={!canEdit}
+                placeholder="Call to action ที่ต้องการให้ผู้ชมทำ"
+                onChange={(e) => setField("cta", e.target.value)}
+              />
+            </InputGroup>
           </div>
           <div>
-            <Label>Visual direction</Label>
-            <Textarea
-              rows={4}
-              value={draft.visualDirection}
-              disabled={!canEdit}
-              onChange={(e) => setField("visualDirection", e.target.value)}
-            />
-          </div>
-          <div>
-            <Label>CTA</Label>
-            <Input
-              value={draft.cta}
-              disabled={!canEdit}
-              onChange={(e) => setField("cta", e.target.value)}
-            />
-          </div>
-          <div>
-            <Label>Strategic notes</Label>
+            <Label>Strategic notes <span className="text-muted-foreground text-xs">(ไม่บังคับ)</span></Label>
             <Textarea
               rows={2}
               value={draft.strategicNotes}
               disabled={!canEdit}
+              placeholder="บันทึกเชิงกลยุทธ์หรือ insight เพิ่มเติม"
               onChange={(e) => setField("strategicNotes", e.target.value)}
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </FormSection>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm">DO&apos;s</CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!canEdit}
-              onClick={() => setField("dos", [...draft.dos, ""])}
-            >
-              + Add
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-2">
+      <FormSection
+        icon="fact_check"
+        title="Guidelines — DO's & DON'Ts"
+        description="สิ่งที่ควรทำและไม่ควรทำในคอนเทนต์นี้"
+        badge={sectionBadges.guidelines}
+        open={secGuidelines}
+        onOpenChange={setSecGuidelines}
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <MaterialIcon name="check_circle" size={15} />
+                DO&apos;s
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canEdit}
+                onClick={() => setField("dos", [...draft.dos, ""])}
+                className="h-7 gap-1 text-xs"
+              >
+                <MaterialIcon name="add" size={14} />
+                เพิ่ม
+              </Button>
+            </div>
             {draft.dos.map((line, i) => (
-              <Input
-                key={`dos-${i}-${line}`}
-                value={line}
-                disabled={!canEdit}
-                onChange={(e) => {
-                  const next = [...draft.dos];
-                  next[i] = e.target.value;
-                  setField("dos", next);
-                }}
-              />
+              <InputGroup key={`dos-${i}-${line}`}>
+                <InputGroupAddon align="inline-start">
+                  <span className="text-[11px] font-bold text-emerald-500">{i + 1}</span>
+                </InputGroupAddon>
+                <InputGroupInput
+                  value={line}
+                  disabled={!canEdit}
+                  placeholder="ควรทำ..."
+                  onChange={(e) => {
+                    const next = [...draft.dos];
+                    next[i] = e.target.value;
+                    setField("dos", next);
+                  }}
+                />
+              </InputGroup>
             ))}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm">DON&apos;Ts</CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!canEdit}
-              onClick={() => setField("donts", [...draft.donts, ""])}
-            >
-              + Add
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-2">
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                <MaterialIcon name="close" size={15} />
+                DON&apos;Ts
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canEdit}
+                onClick={() => setField("donts", [...draft.donts, ""])}
+                className="h-7 gap-1 text-xs"
+              >
+                <MaterialIcon name="add" size={14} />
+                เพิ่ม
+              </Button>
+            </div>
             {draft.donts.map((line, i) => (
-              <Input
-                key={`donts-${i}-${line}`}
-                value={line}
-                disabled={!canEdit}
-                onChange={(e) => {
-                  const next = [...draft.donts];
-                  next[i] = e.target.value;
-                  setField("donts", next);
-                }}
-              />
+              <InputGroup key={`donts-${i}-${line}`}>
+                <InputGroupAddon align="inline-start">
+                  <span className="text-[11px] font-bold text-rose-500">{i + 1}</span>
+                </InputGroupAddon>
+                <InputGroupInput
+                  value={line}
+                  disabled={!canEdit}
+                  placeholder="ไม่ควรทำ..."
+                  onChange={(e) => {
+                    const next = [...draft.donts];
+                    next[i] = e.target.value;
+                    setField("donts", next);
+                  }}
+                />
+              </InputGroup>
             ))}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </FormSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">References & assets</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex justify-between gap-2">
+      <FormSection
+        icon="link"
+        title="References & Assets"
+        description="ลิงก์อ้างอิง, โฟลเดอร์ไฟล์งาน"
+        badge={sectionBadges.refs}
+        open={secRefs}
+        onOpenChange={setSecRefs}
+      >
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
             <Label className="flex-1">Reference links</Label>
             {canEdit ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                className="h-7 gap-1 text-xs"
                 onClick={() =>
                   setField("referenceLinks", [...draft.referenceLinks, ""])
                 }
               >
-                + Link
+                <MaterialIcon name="add" size={14} />
+                เพิ่มลิงก์
               </Button>
             ) : null}
           </div>
@@ -1036,24 +1206,29 @@ export function BriefDetailClient({ briefId }: Props) {
             canEdit={canEdit}
             onChange={(v) => setField("assetFolderLink", v)}
           />
-        </CardContent>
-      </Card>
+        </div>
+      </FormSection>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <MaterialIcon name="fact_check" size={18} />
+      <FormSection
+        icon="shield_person"
+        title="Approval & Revisions"
+        description="ผู้อนุมัติ, ประวัติการแก้ไข"
+        badge={sectionBadges.approval}
+        open={secApproval}
+        onOpenChange={setSecApproval}
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-3">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <MaterialIcon name="fact_check" size={14} />
               Approval track
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </p>
             {(draft.approvalTrack ?? DEFAULT_APPROVAL_ROWS).map((row, idx) => (
               <div
                 key={row.role}
-                className="grid gap-2 rounded-lg border border-border/80 p-3 sm:grid-cols-[1fr_auto]"
+                className="grid gap-2 rounded-xl border border-border/70 bg-muted/30 p-3 sm:grid-cols-[1fr_auto]"
               >
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">
                     {APPROVAL_ROLE_LABELS[row.role]}
                   </Label>
@@ -1067,7 +1242,7 @@ export function BriefDetailClient({ briefId }: Props) {
                   />
                 </div>
                 <div className="flex flex-col justify-end gap-2 sm:items-end">
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
                     <Checkbox
                       checked={row.approved}
                       disabled={!canEdit}
@@ -1085,33 +1260,37 @@ export function BriefDetailClient({ briefId }: Props) {
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
 
-        <RevisionHistoryCard
-          canEdit={canEdit}
-          revRound={revRound}
-          revNote={revNote}
-          history={draft.revisionHistory ?? []}
-          onRoundChange={setRevRound}
-          onNoteChange={setRevNote}
-          onAdd={addRevisionEntry}
-        />
-      </div>
+          <RevisionHistoryCard
+            canEdit={canEdit}
+            revRound={revRound}
+            revNote={revNote}
+            history={draft.revisionHistory ?? []}
+            onRoundChange={setRevRound}
+            onNoteChange={setRevNote}
+            onAdd={addRevisionEntry}
+          />
+        </div>
+      </FormSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <MaterialIcon name="track_changes" size={18} />
-            KPI targets ({FUNNEL_CONFIG[draft.funnelStage].label})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
+      <FormSection
+        icon="track_changes"
+        title={`KPI Targets — ${FUNNEL_CONFIG[draft.funnelStage].label}`}
+        description="เป้าหมายตัวชี้วัดตาม funnel stage"
+        badge={sectionBadges.kpi}
+        open={secKpi}
+        onOpenChange={setSecKpi}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
           {kpiFields.map(({ key, label, suffix }) => (
             <div key={key}>
               <Label>{label}</Label>
-              <div className="flex items-center gap-2">
-                <Input
+              <InputGroup>
+                <InputGroupAddon align="inline-start">
+                  <MaterialIcon name="track_changes" size={15} className="text-muted-foreground" />
+                </InputGroupAddon>
+                <InputGroupInput
                   type="number"
                   value={draft.kpiTargets[key] ?? ""}
                   disabled={!canEdit}
@@ -1121,13 +1300,15 @@ export function BriefDetailClient({ briefId }: Props) {
                   }}
                 />
                 {suffix && (
-                  <span className="text-xs text-muted-foreground">{suffix}</span>
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupText>{suffix}</InputGroupText>
+                  </InputGroupAddon>
                 )}
-              </div>
+              </InputGroup>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </FormSection>
 
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur md:left-[240px] max-xl:md:left-[72px] max-md:left-0">
         <div className="mx-auto flex max-w-5xl justify-end gap-2">
