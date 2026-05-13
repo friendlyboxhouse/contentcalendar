@@ -43,6 +43,17 @@ export function AssigneePicker({
     [roles]
   );
 
+  const memberLabelForId = (userId: string) => {
+    const member = memberById.get(userId);
+    return (
+      member?.display_name ||
+      member?.email ||
+      memberLabelFromUserId(userId, workspaceMembers)
+    );
+  };
+
+  const roleLabelForId = (roleId: string) => roleById.get(roleId)?.label ?? "";
+
   const addAssignee = () => {
     const resolvedRoleId = roleIdDraft || firstRoleId;
     if (!userIdDraft || !resolvedRoleId) return;
@@ -80,7 +91,9 @@ export function AssigneePicker({
           disabled={disabled}
         >
           <SelectTrigger>
-            <SelectValue placeholder="เลือกสมาชิก" />
+            <SelectValue placeholder="เลือกสมาชิก">
+              {(value) => (value ? memberLabelForId(String(value)) : null)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {workspaceMembers.map((member) => (
@@ -91,12 +104,14 @@ export function AssigneePicker({
           </SelectContent>
         </Select>
         <Select
-          value={roleIdDraft || firstRoleId}
+          value={roleIdDraft}
           onValueChange={(v) => setRoleIdDraft(v ?? "")}
           disabled={disabled}
         >
           <SelectTrigger>
-            <SelectValue placeholder="เลือกบทบาท" />
+            <SelectValue placeholder="เลือกบทบาท">
+              {(value) => (value ? roleLabelForId(String(value)) : null)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {roles.map((role) => (

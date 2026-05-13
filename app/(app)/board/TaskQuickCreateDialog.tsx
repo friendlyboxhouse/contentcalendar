@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,15 @@ export function TaskQuickCreateDialog({
   const [listId, setListId] = useState<string>("");
   const [due, setDue] = useState("");
   const [assignees, setAssignees] = useState<TaskAssignee[]>([]);
+
+  const listById = useMemo(
+    () => new Map(lists.map((list) => [list.id, list])),
+    [lists]
+  );
+  const typeById = useMemo(
+    () => new Map(types.map((type) => [type.id, type])),
+    [types]
+  );
 
   const submit = () => {
     const trimmed = title.trim();
@@ -80,7 +89,11 @@ export function TaskQuickCreateDialog({
           <div className="grid gap-2 sm:grid-cols-2">
             <Select value={listId} onValueChange={(v) => setListId(v ?? "")}>
               <SelectTrigger>
-                <SelectValue placeholder="เลือกคอลัมน์" />
+                <SelectValue placeholder="เลือกคอลัมน์">
+                  {(value) =>
+                    value ? listById.get(String(value))?.label ?? null : null
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {lists.map((list) => (
@@ -92,7 +105,11 @@ export function TaskQuickCreateDialog({
             </Select>
             <Select value={typeId} onValueChange={(v) => setTypeId(v ?? "")}>
               <SelectTrigger>
-                <SelectValue placeholder="ประเภทงาน" />
+                <SelectValue placeholder="ประเภทงาน">
+                  {(value) =>
+                    value ? typeById.get(String(value))?.label ?? null : null
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {types.map((type) => (
